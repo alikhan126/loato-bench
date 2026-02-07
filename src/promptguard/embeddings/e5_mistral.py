@@ -31,6 +31,8 @@ class E5MistralEmbedding(EmbeddingModel):
         from llama_cpp import Llama
 
         self._config = config
+        assert config.gguf_repo is not None, "gguf_repo is required for E5-Mistral"
+        assert config.gguf_file is not None, "gguf_file is required for E5-Mistral"
         model_path = hf_hub_download(
             config.gguf_repo,
             filename=config.gguf_file,

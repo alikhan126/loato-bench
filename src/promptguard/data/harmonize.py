@@ -189,7 +189,8 @@ def detect_language(text: str) -> str:
     if not text or not text.strip():
         return "unknown"
     try:
-        return detect(text)
+        result: str = detect(text)
+        return result
     except LangDetectException:
         return "unknown"
 

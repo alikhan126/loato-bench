@@ -80,7 +80,7 @@ class EmbeddingCache:
         if not self._meta_path.exists():
             return False
         meta = json.loads(self._meta_path.read_text())
-        return meta["model_version"] == model_version and meta["text_hash"] == text_hash
+        return bool(meta["model_version"] == model_version and meta["text_hash"] == text_hash)
 
     def clear(self) -> None:
         """Remove cached files."""

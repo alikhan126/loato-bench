@@ -64,7 +64,7 @@ class ExperimentConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def load_yaml(path: Path) -> dict:
+def load_yaml(path: Path) -> dict[str, Any]:
     """Load a YAML file and return its contents as a dict."""
     with open(path) as f:
         return yaml.safe_load(f) or {}

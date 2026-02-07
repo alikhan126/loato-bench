@@ -1,15 +1,17 @@
 """Embedding model implementations and caching."""
 
+from collections.abc import Callable
+
 from promptguard.embeddings.base import EmbeddingModel
 from promptguard.embeddings.cache import EmbeddingCache, compute_text_hash
 from promptguard.embeddings.instructor import InstructorEmbeddingModel
 from promptguard.embeddings.openai_embed import OpenAIEmbedding
 from promptguard.embeddings.sentence_tf import SentenceTransformerEmbedding
-from promptguard.utils.config import load_embedding_config
+from promptguard.utils.config import EmbeddingConfig, load_embedding_config
 
 # E5MistralEmbedding is imported lazily since it requires llama-cpp-python
 
-_MODEL_CLASS_MAP = {
+_MODEL_CLASS_MAP: dict[str, Callable[[EmbeddingConfig], EmbeddingModel]] = {
     "sentence-transformers": SentenceTransformerEmbedding,
     "InstructorEmbedding": InstructorEmbeddingModel,
     "openai": OpenAIEmbedding,

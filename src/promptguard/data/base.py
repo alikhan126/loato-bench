@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -18,7 +19,7 @@ class UnifiedSample:
     original_category: str | None = None
     language: str = "en"
     is_indirect: bool = False
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class DatasetLoader(ABC):

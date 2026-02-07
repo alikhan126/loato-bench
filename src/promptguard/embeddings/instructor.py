@@ -36,5 +36,7 @@ class InstructorEmbeddingModel(EmbeddingModel):
     def encode(self, texts: list[str], batch_size: int = 32) -> NDArray[np.float32]:
         instruction = self._config.instruction or ""
         pairs = [[instruction, text] for text in texts]
-        result = self._model.encode(pairs, batch_size=batch_size, show_progress_bar=True)
+        result: NDArray[np.float32] = self._model.encode(
+            pairs, batch_size=batch_size, show_progress_bar=True
+        )
         return result.astype(np.float32)

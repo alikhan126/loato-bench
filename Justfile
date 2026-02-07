@@ -1,3 +1,15 @@
+lint:
+    uv run ruff check src/ tests/
+    uv run ruff format --check src/ tests/
+
+typecheck:
+    uv run mypy
+
+test:
+    uv run pytest tests/ -v --tb=short --cov --cov-report=term-missing
+
+check: lint typecheck test
+
 data:
     uv run promptguard data download
     uv run promptguard data harmonize

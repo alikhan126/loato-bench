@@ -59,6 +59,10 @@ dev = [
     "jupyter>=1.0",
     "nbstripout>=0.7",
     "pytest-cov>=7.0.0",
+    "mypy>=1.13",
+    "types-PyYAML>=6.0",
+    "types-tqdm>=4.66",
+    "pandas-stubs>=2.2",
 ]
 
 [build-system]
@@ -98,3 +102,34 @@ omit = [
     "src/promptguard/analysis/*",
 ]
 fail_under = 90
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["promptguard"]
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+module = [
+    "datasketch.*",
+    "langdetect.*",
+    "InstructorEmbedding.*",
+    "datasets.*",
+    "sentence_transformers.*",
+    "wandb.*",
+    "huggingface_hub.*",
+    "llama_cpp.*",
+    "umap.*",
+    "shap.*",
+    "seaborn.*",
+    "matplotlib.*",
+    "scipy.*",
+    "statsmodels.*",
+    "numba.*",
+    "llvmlite.*",
+    "xgboost.*",
+]
+ignore_missing_imports = true
