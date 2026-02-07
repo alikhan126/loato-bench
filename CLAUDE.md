@@ -94,8 +94,8 @@ Stats: bootstrap 95% CIs (10K resamples), McNemar, Friedman + Nemenyi, Cohen's d
 ## Sprint Status
 
 - [x] Sprint 0: Scaffolding, ABCs, CLI, configs
-- [ ] Sprint 1A: Data pipeline (5 dataset loaders, harmonization, EDA)
-- [ ] Sprint 1B: Embedding pipeline (5 models, cache, W&B utils)
+- [x] Sprint 1A: Data pipeline (5 dataset loaders, harmonization) — 5/5 loaders done, EDA remains
+- [x] Sprint 1B: Embedding pipeline (5 models, cache, W&B utils) — all implemented + tested
 - [ ] Sprint 2A: Taxonomy mapping + split generation
 - [ ] Sprint 2B: Classifier implementations + training pipeline + sweeps
 - [ ] Sprint 3: Core experiments (Standard CV + LOATO)
