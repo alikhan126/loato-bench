@@ -75,3 +75,26 @@ select = ["E", "F", "I", "UP"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["promptguard"]
+omit = [
+    "src/promptguard/cli.py",
+    "src/promptguard/classifiers/*",
+    "src/promptguard/evaluation/*",
+    "src/promptguard/analysis/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "if TYPE_CHECKING:",
+]
+omit = [
+    "src/promptguard/cli.py",
+    "src/promptguard/classifiers/*",
+    "src/promptguard/evaluation/*",
+    "src/promptguard/analysis/*",
+]
+fail_under = 90
