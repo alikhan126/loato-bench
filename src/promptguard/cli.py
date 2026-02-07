@@ -42,13 +42,20 @@ app.add_typer(analyze_app, name="analyze")
 @data_app.command()
 def download() -> None:
     """Download all raw datasets via HuggingFace."""
-    from promptguard.data import DeepsetLoader, GenTelLoader, HackaPromptLoader, PINTLoader
+    from promptguard.data import (
+        DeepsetLoader,
+        GenTelLoader,
+        HackaPromptLoader,
+        OpenPromptLoader,
+        PINTLoader,
+    )
 
     loaders = [
         ("Deepset", DeepsetLoader()),
         ("HackAPrompt", HackaPromptLoader()),
         ("GenTel-Bench", GenTelLoader(max_samples=10000)),
         ("PINT/Gandalf", PINTLoader()),
+        ("Open-Prompt-Injection", OpenPromptLoader()),
     ]
 
     raw_dir = DATA_DIR / "raw"
@@ -132,14 +139,47 @@ def embed_run(
     all_models: bool = typer.Option(False, "--all", help="Run all embedding models."),
 ) -> None:
     """Compute embeddings for one or all models."""
+    import pandas as pd
+
+    from promptguard.embeddings import EmbeddingCache, compute_text_hash, get_embedding_model
+
     models = EMBEDDING_MODELS if all_models else ([model] if model else [])
     if not models:
         console.print("[red]Specify --model <name> or --all[/red]")
         raise typer.Exit(1)
+
+    # Load processed dataset
+    parquet_path = DATA_DIR / "processed" / "unified_dataset.parquet"
+    if not parquet_path.exists():
+        console.print("[red]No processed data. Run 'promptguard data harmonize' first.[/red]")
+        raise typer.Exit(1)
+
+    df = pd.read_parquet(parquet_path)
+    texts = df["text"].tolist()
+    sample_ids = [str(i) for i in range(len(texts))]
+    text_hash = compute_text_hash(texts)
+
+    console.print(f"[dim]Loaded {len(texts)} texts from {parquet_path.name}[/dim]")
+
     for m in models:
-        console.print(f"[bold green]Computing embeddings: {m}[/bold green]")
-        # TODO: Sprint 1B — invoke embedding pipeline
-    console.print("[yellow]Not yet implemented.[/yellow]")
+        console.print(f"\n[bold green]Embedding model: {m}[/bold green]")
+        cache = EmbeddingCache(m)
+
+        if cache.is_valid(model_version=m, text_hash=text_hash):
+            console.print(f"  [dim]Cache hit — skipping {m}[/dim]")
+            result = cache.load()
+            if result:
+                emb, _ = result
+                console.print(f"  [dim]{emb.shape[0]} samples × {emb.shape[1]} dims[/dim]")
+            continue
+
+        console.print("  [dim]Cache miss — computing embeddings...[/dim]")
+        emb_model = get_embedding_model(m)
+        embeddings = emb_model.encode(texts)
+        cache.save(embeddings, sample_ids, model_version=m, text_hash=text_hash)
+        console.print(
+            f"  [bold]{embeddings.shape[0]} samples × {embeddings.shape[1]} dims → cached[/bold]"
+        )
 
 
 # ---------------------------------------------------------------------------

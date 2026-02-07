@@ -10,9 +10,9 @@ wheels/
 # Virtual environments
 .venv/
 
-# Data & results (large / generated)
-data/
-results/
+# Data & results (large / generated) — only top-level dirs
+/data/
+/results/
 
 # Environment secrets
 .env

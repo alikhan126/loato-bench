@@ -1,0 +1,72 @@
+# Attack taxonomy for PromptGuard LOATO evaluation
+# Categories finalized after Sprint 1A EDA
+
+# Candidate categories (to be refined based on data):
+categories:
+  instruction_override:
+    id: 0
+    description: "Direct instruction override (ignore previous, do instead, etc.)"
+    regex_patterns:
+      - 'ignore\s+(all\s+)?(previous|above|prior)'
+      - 'disregard\s+(all\s+)?(previous|above|prior)'
+      - 'forget\s+(all\s+)?(previous|above|prior)'
+
+  jailbreak_roleplay:
+    id: 1
+    description: "Jailbreak via roleplay, persona, or fictional framing"
+    regex_patterns:
+      - 'pretend\s+(you\s+are|to\s+be)'
+      - 'act\s+as\s+(if|a|an)'
+      - 'you\s+are\s+now'
+      - 'DAN'
+      - 'developer\s+mode'
+
+  obfuscation_encoding:
+    id: 2
+    description: "Obfuscation via encoding, character manipulation, typos"
+    regex_patterns:
+      - 'base64'
+      - 'rot13'
+      - 'hex\s+encoded'
+
+  context_manipulation:
+    id: 3
+    description: "Context window manipulation, prompt leaking, system prompt extraction"
+    regex_patterns:
+      - 'system\s+prompt'
+      - 'repeat\s+(the|your)\s+(instructions|prompt)'
+      - 'what\s+(are|were)\s+your\s+instructions'
+
+  payload_splitting:
+    id: 4
+    description: "Splitting malicious payload across multiple messages"
+    regex_patterns: []
+
+  information_extraction:
+    id: 5
+    description: "Extracting confidential info, training data, or internal state"
+    regex_patterns:
+      - 'reveal\s+(your|the)\s+(secret|password|key)'
+      - 'what\s+is\s+the\s+(secret|password|key)'
+
+  indirect_injection:
+    id: 6
+    description: "Injection via external content (documents, web pages, tool outputs)"
+    regex_patterns: []
+
+  social_engineering:
+    id: 7
+    description: "Emotional manipulation, urgency, authority appeals"
+    regex_patterns:
+      - 'emergency'
+      - 'urgent'
+      - 'as\s+(your|the)\s+(creator|developer|admin)'
+
+# Merge rule: any category with <50 samples after mapping gets merged
+# into the closest larger category. Final K may be 6-8.
+min_category_size: 50
+
+# Mapping tiers (applied in order):
+# Tier 1: Direct source mapping (Open-Prompt types, PINT categories)
+# Tier 2: Regex heuristics (patterns above)
+# Tier 3: LLM-assisted classification (GPT-4o-mini, cap 2000 calls)

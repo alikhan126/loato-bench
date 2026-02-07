@@ -1,0 +1,29 @@
+# Dataset source configurations for PromptGuard
+# Each source maps to a DatasetLoader implementation
+
+sources:
+  deepset:
+    hf_path: "deepset/prompt-injections"
+    description: "~662 samples, binary labels, merge train+test"
+    loader: "promptguard.data.deepset.DeepsetLoader"
+
+  hackaprompt:
+    hf_path: "hackaprompt/hackaprompt-dataset"
+    description: "~600K raw → filter correct==True → dedup → cap ~5K. Injection-only."
+    loader: "promptguard.data.hackaprompt.HackaPromptLoader"
+    max_samples: 5000
+
+  gentelbench:
+    hf_path: "GenTelLab/gentelbench-v1"
+    description: "~177K total. Content harm categories — needs EDA quality gate."
+    loader: "promptguard.data.gentel.GenTelLoader"
+
+  open_prompt_injection:
+    source_type: "github"
+    description: "Indirect injection samples. Requires cloning repo + extraction."
+    loader: "promptguard.data.open_prompt.OpenPromptLoader"
+
+  pint:
+    description: "Multilingual. Email Lakera for access → gandalf fallback."
+    loader: "promptguard.data.pint.PINTLoader"
+    fallback_hf_path: "lakera/gandalf_ignore_instructions"
