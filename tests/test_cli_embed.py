@@ -1,10 +1,17 @@
 """Tests for embed CLI commands — Sprint 1B."""
 
+import re
+
 from typer.testing import CliRunner
 
 from promptguard.cli import app
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences from text."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 class TestEmbedAppHelp:
@@ -18,5 +25,6 @@ class TestEmbedAppHelp:
     def test_embed_run_help(self):
         result = runner.invoke(app, ["embed", "run", "--help"])
         assert result.exit_code == 0
-        assert "--model" in result.output
-        assert "--all" in result.output
+        output = _strip_ansi(result.output)
+        assert "--model" in output
+        assert "--all" in output
