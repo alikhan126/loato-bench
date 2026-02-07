@@ -1,0 +1,9 @@
+# BGE-large-en-v1.5 embedding configuration
+model:
+  name: "bge_large"
+  hf_path: "BAAI/bge-large-en-v1.5"
+  dim: 1024
+  library: "sentence-transformers"
+  device: "mps"
+  batch_size: 32
+  prefix: "Represent this sentence for classification: "

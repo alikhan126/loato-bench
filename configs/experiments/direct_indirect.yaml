@@ -1,0 +1,6 @@
+# Direct → Indirect transfer experiment
+experiment:
+  name: "direct_indirect"
+  description: "Train on direct injections, test on indirect injections + benign"
+  split_file: "data/splits/direct_indirect_split.json"
+  seed: 42

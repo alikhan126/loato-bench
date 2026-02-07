@@ -1,0 +1,12 @@
+# SVM (RBF kernel) classifier configuration
+classifier:
+  name: "svm"
+  class: "promptguard.classifiers.svm.SVMClassifier"
+  hyperparams:
+    C: 1.0
+    kernel: "rbf"
+    gamma: "scale"
+    probability: true
+  sweep:
+    C: [0.1, 1, 10, 100]
+    gamma: ["scale", "auto", 0.001, 0.01]

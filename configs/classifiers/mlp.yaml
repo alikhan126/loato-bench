@@ -1,0 +1,13 @@
+# MLP (2-layer) classifier configuration
+classifier:
+  name: "mlp"
+  class: "promptguard.classifiers.mlp.MLPClassifier_"
+  hyperparams:
+    hidden_layer_sizes: [256, 128]
+    learning_rate_init: 0.001
+    max_iter: 500
+    early_stopping: true
+    validation_fraction: 0.1
+  sweep:
+    hidden_layer_sizes: [[128, 64], [256, 128], [512, 256]]
+    learning_rate_init: [0.0001, 0.001, 0.01]

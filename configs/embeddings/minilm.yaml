@@ -1,0 +1,9 @@
+# all-MiniLM-L6-v2 embedding configuration
+model:
+  name: "minilm"
+  hf_path: "sentence-transformers/all-MiniLM-L6-v2"
+  dim: 384
+  library: "sentence-transformers"
+  device: "mps"
+  batch_size: 64
+  prefix: null

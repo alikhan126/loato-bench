@@ -1,0 +1,7 @@
+# LOATO (Leave-One-Attack-Type-Out) experiment
+experiment:
+  name: "loato"
+  description: "For each attack category K: train on K-1 types + all benign, test on held-out + 20% benign"
+  split_file: "data/splits/loato_splits.json"
+  benign_test_fraction: 0.2
+  seed: 42

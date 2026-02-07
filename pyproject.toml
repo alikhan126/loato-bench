@@ -1,0 +1,76 @@
+[project]
+name = "promptguard"
+version = "0.1.0"
+description = "Cross-attack generalization of embedding-based prompt injection classifiers — LOATO evaluation protocol"
+readme = "README.md"
+authors = [
+    { name = "Ali Khan", email = "alirazakhan.offi@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    # Data
+    "pandas>=2.2",
+    "pyarrow>=17.0",
+    "datasets>=3.0",
+    "pyyaml>=6.0",
+    "datasketch>=1.6",
+    "langdetect>=1.0",
+    # ML
+    "scikit-learn>=1.5",
+    "xgboost>=2.1",
+    "numpy>=1.26",
+    # Embeddings
+    "sentence-transformers>=3.0",
+    "InstructorEmbedding>=1.0",
+    "openai>=1.40",
+    # DL backend
+    "torch>=2.4",
+    # Tracking
+    "wandb>=0.17",
+    # Viz / Analysis
+    "matplotlib>=3.9",
+    "seaborn>=0.13",
+    "umap-learn>=0.5.7",
+    "numba>=0.59",
+    "llvmlite>=0.42",
+    "shap>=0.45",
+    # Stats
+    "scipy>=1.14",
+    "statsmodels>=0.14",
+    # CLI
+    "typer>=0.12",
+    "rich>=13.7",
+    "tqdm>=4.66",
+    # Config
+    "pydantic>=2.8",
+    "python-dotenv>=1.0",
+    # Robustness
+    "tenacity>=8.5",
+]
+
+[project.scripts]
+promptguard = "promptguard.cli:app_entry"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.5",
+    "ipykernel>=6.29",
+    "jupyter>=1.0",
+    "nbstripout>=0.7",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.3,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

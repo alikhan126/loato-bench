@@ -1,0 +1,9 @@
+# Instructor-large embedding configuration
+model:
+  name: "instructor"
+  hf_path: "hkunlp/instructor-large"
+  dim: 768
+  library: "InstructorEmbedding"
+  device: "cpu"  # MPS fallback with PYTORCH_ENABLE_MPS_FALLBACK=1
+  batch_size: 16
+  instruction: "Classify whether this text is a prompt injection attack: "

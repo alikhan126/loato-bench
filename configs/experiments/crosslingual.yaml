@@ -1,0 +1,6 @@
+# Cross-lingual transfer experiment
+experiment:
+  name: "crosslingual"
+  description: "Train on English only, test on non-English + benign"
+  split_file: "data/splits/crosslingual_split.json"
+  seed: 42

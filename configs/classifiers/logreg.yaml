@@ -1,0 +1,10 @@
+# Logistic Regression classifier configuration
+classifier:
+  name: "logreg"
+  class: "promptguard.classifiers.logreg.LogRegClassifier"
+  hyperparams:
+    C: 1.0
+    max_iter: 1000
+    solver: "lbfgs"
+  sweep:
+    C: [0.001, 0.01, 0.1, 1, 10, 100]

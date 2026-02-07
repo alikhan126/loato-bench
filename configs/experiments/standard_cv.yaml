@@ -1,0 +1,8 @@
+# Standard 5-Fold Cross-Validation experiment
+experiment:
+  name: "standard_cv"
+  description: "Stratified 5-fold CV by label + attack_category"
+  split_file: "data/splits/standard_cv_folds.json"
+  n_folds: 5
+  stratify_by: ["label", "attack_category"]
+  seed: 42

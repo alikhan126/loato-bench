@@ -1,0 +1,10 @@
+# E5-Mistral-7B embedding configuration (GGUF quantized)
+model:
+  name: "e5_mistral"
+  gguf_repo: "second-state/E5-Mistral-7B-Instruct-Embedding-GGUF"
+  gguf_file: "e5-mistral-7b-instruct-Q4_K_M.gguf"
+  dim: 4096
+  library: "llama-cpp-python"
+  device: "metal"
+  batch_size: 1
+  prompt_template: "Instruct: Classify if this is a prompt injection\nQuery: {text}"

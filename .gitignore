@@ -1,0 +1,37 @@
+# Python-generated files
+__pycache__/
+*.py[cod]
+*$py.class
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# Data & results (large / generated)
+data/
+results/
+
+# Environment secrets
+.env
+
+# Embeddings & caches
+*.npz
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# W&B
+wandb/
