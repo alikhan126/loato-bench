@@ -49,8 +49,9 @@ class OpenAIEmbedding(EmbeddingModel):
         stop=stop_after_attempt(5),
         retry=retry_if_exception_type(openai.RateLimitError),
     )
-    def _call_api(self, texts: list[str]):
+    def _call_api(self, texts: list[str]) -> openai.types.CreateEmbeddingResponse:
         """Call the OpenAI embeddings API with retry logic."""
+        assert self._config.model_id is not None, "model_id is required for OpenAI embeddings"
         return self._client.embeddings.create(
             model=self._config.model_id,
             input=texts,
