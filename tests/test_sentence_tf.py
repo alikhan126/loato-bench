@@ -132,6 +132,4 @@ class TestSentenceTransformerEncode:
     def test_loads_model_with_correct_hf_path(self, mock_cls):
         """Constructor loads the correct HuggingFace model."""
         SentenceTransformerEmbedding(_minilm_config())
-        mock_cls.assert_called_once_with(
-            "sentence-transformers/all-MiniLM-L6-v2", device="cpu"
-        )
+        mock_cls.assert_called_once_with("sentence-transformers/all-MiniLM-L6-v2", device="cpu")

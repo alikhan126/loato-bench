@@ -91,7 +91,9 @@ def exact_dedup(samples: list[UnifiedSample]) -> list[UnifiedSample]:
     if removed > 0:
         logger.info(
             "Exact dedup removed %d duplicates (%d → %d)",
-            removed, len(samples), len(result),
+            removed,
+            len(samples),
+            len(result),
         )
     return result
 
@@ -159,7 +161,9 @@ def near_dedup(
     if removed > 0:
         logger.info(
             "Near dedup removed %d samples (%d → %d)",
-            removed, len(samples), len(result),
+            removed,
+            len(samples),
+            len(result),
         )
     return result
 
