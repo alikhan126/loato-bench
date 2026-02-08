@@ -35,3 +35,7 @@ Thumbs.db
 
 # W&B
 wandb/
+
+# Coverage reports
+.coverage
+htmlcov/

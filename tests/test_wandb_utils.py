@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from promptguard.tracking.wandb_utils import (
+from loato_bench.tracking.wandb_utils import (
     finish_run,
     init_run,
     log_confusion_matrix,
@@ -15,7 +15,7 @@ from promptguard.tracking.wandb_utils import (
 class TestInitRun:
     """Tests for init_run."""
 
-    @patch("promptguard.tracking.wandb_utils.wandb")
+    @patch("loato_bench.tracking.wandb_utils.wandb")
     def test_calls_wandb_init_with_correct_name(self, mock_wandb):
         mock_wandb.init.return_value = MagicMock()
         init_run("loato", "minilm", "xgboost", 3)
@@ -23,28 +23,28 @@ class TestInitRun:
         call_kwargs = mock_wandb.init.call_args[1]
         assert call_kwargs["name"] == "loato_minilm_xgboost_3"
 
-    @patch("promptguard.tracking.wandb_utils.wandb")
+    @patch("loato_bench.tracking.wandb_utils.wandb")
     def test_group_follows_convention(self, mock_wandb):
         mock_wandb.init.return_value = MagicMock()
         init_run("standard_cv", "bge_large", "svm", 0)
         call_kwargs = mock_wandb.init.call_args[1]
         assert call_kwargs["group"] == "standard_cv_bge_large_svm"
 
-    @patch("promptguard.tracking.wandb_utils.wandb")
-    def test_project_is_promptguard_lite(self, mock_wandb):
+    @patch("loato_bench.tracking.wandb_utils.wandb")
+    def test_project_is_loato_bench(self, mock_wandb):
         mock_wandb.init.return_value = MagicMock()
         init_run("loato", "minilm", "logreg", 1)
         call_kwargs = mock_wandb.init.call_args[1]
-        assert call_kwargs["project"] == "promptguard-lite"
+        assert call_kwargs["project"] == "loato-bench"
 
-    @patch("promptguard.tracking.wandb_utils.wandb")
+    @patch("loato_bench.tracking.wandb_utils.wandb")
     def test_tags_include_experiment_embedding_classifier(self, mock_wandb):
         mock_wandb.init.return_value = MagicMock()
         init_run("loato", "minilm", "mlp", 2)
         call_kwargs = mock_wandb.init.call_args[1]
         assert set(call_kwargs["tags"]) == {"loato", "minilm", "mlp"}
 
-    @patch("promptguard.tracking.wandb_utils.wandb")
+    @patch("loato_bench.tracking.wandb_utils.wandb")
     def test_passes_config_dict(self, mock_wandb):
         mock_wandb.init.return_value = MagicMock()
         cfg = {"lr": 0.01, "epochs": 10}
@@ -52,7 +52,7 @@ class TestInitRun:
         call_kwargs = mock_wandb.init.call_args[1]
         assert call_kwargs["config"] == cfg
 
-    @patch("promptguard.tracking.wandb_utils.wandb")
+    @patch("loato_bench.tracking.wandb_utils.wandb")
     def test_returns_wandb_run(self, mock_wandb):
         mock_run = MagicMock()
         mock_wandb.init.return_value = mock_run
@@ -79,7 +79,7 @@ class TestLogMetrics:
 class TestLogConfusionMatrix:
     """Tests for log_confusion_matrix."""
 
-    @patch("promptguard.tracking.wandb_utils.wandb")
+    @patch("loato_bench.tracking.wandb_utils.wandb")
     def test_logs_confusion_matrix(self, mock_wandb):
         mock_run = MagicMock()
         y_true = np.array([0, 1, 1, 0])

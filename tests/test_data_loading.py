@@ -1,6 +1,6 @@
 """Tests for dataset loaders — Sprint 1A."""
 
-from promptguard.data.base import DatasetLoader, UnifiedSample
+from loato_bench.data.base import DatasetLoader, UnifiedSample
 
 
 def test_unified_sample_defaults():

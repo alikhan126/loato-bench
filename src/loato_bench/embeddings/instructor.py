@@ -8,8 +8,8 @@ import numpy as np
 from InstructorEmbedding import INSTRUCTOR
 from numpy.typing import NDArray
 
-from promptguard.embeddings.base import EmbeddingModel
-from promptguard.utils.config import EmbeddingConfig
+from loato_bench.embeddings.base import EmbeddingModel
+from loato_bench.utils.config import EmbeddingConfig
 
 
 class InstructorEmbeddingModel(EmbeddingModel):

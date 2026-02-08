@@ -1,4 +1,4 @@
-# PromptGuard-Lite
+# LOATO-Bench
 
 **Cross-Attack Generalization of Embedding-Based Prompt Injection Classifiers**
 
@@ -6,7 +6,7 @@ MS Data Science Capstone — Pace University
 
 ## Overview
 
-PromptGuard-Lite studies whether embedding-based prompt injection classifiers trained on *known* attack types can detect *unseen* attack categories. The core contribution is a **LOATO (Leave-One-Attack-Type-Out)** evaluation protocol applied to 5 embedding models × 4 classifiers on a unified benchmark of ~20K+ samples from 5 public datasets.
+LOATO-Bench studies whether embedding-based prompt injection classifiers trained on *known* attack types can detect *unseen* attack categories. The core contribution is a **LOATO (Leave-One-Attack-Type-Out)** evaluation protocol applied to 5 embedding models × 4 classifiers on a unified benchmark of ~20K+ samples from 5 public datasets.
 
 ### Research Questions
 
@@ -69,7 +69,7 @@ PromptGuard-Lite studies whether embedding-based prompt injection classifiers tr
 
 ```bash
 git clone <repo-url>
-cd promptguard
+cd loato-bench
 
 # Install all dependencies
 uv sync
@@ -94,29 +94,29 @@ bash scripts/setup_e5_gguf.sh
 
 ```bash
 # Show all commands
-uv run promptguard --help
+uv run loato-bench --help
 
 # Data pipeline
-uv run promptguard data download
-uv run promptguard data harmonize
-uv run promptguard data split
+uv run loato-bench data download
+uv run loato-bench data harmonize
+uv run loato-bench data split
 
 # Compute embeddings
-uv run promptguard embed run --all
-uv run promptguard embed run --model minilm
+uv run loato-bench embed run --all
+uv run loato-bench embed run --model minilm
 
 # Train classifiers
-uv run promptguard train run --all --experiment standard_cv
-uv run promptguard train run --all --experiment loato
-uv run promptguard train run --embedding minilm --classifier xgboost --experiment loato
+uv run loato-bench train run --all --experiment standard_cv
+uv run loato-bench train run --all --experiment loato
+uv run loato-bench train run --embedding minilm --classifier xgboost --experiment loato
 
 # Hyperparameter sweeps
-uv run promptguard sweep run --all
+uv run loato-bench sweep run --all
 
 # Analysis
-uv run promptguard analyze features --all
-uv run promptguard analyze llm-baseline --samples 500
-uv run promptguard analyze report
+uv run loato-bench analyze features --all
+uv run loato-bench analyze llm-baseline --samples 500
+uv run loato-bench analyze report
 ```
 
 ### Justfile (run full pipeline)
@@ -138,7 +138,7 @@ uv run pytest tests/ -v
 ## Project Structure
 
 ```
-promptguard/
+loato-bench/
 ├── pyproject.toml
 ├── Justfile
 ├── configs/
@@ -146,7 +146,7 @@ promptguard/
 │   ├── embeddings/     # one YAML per embedding model
 │   ├── classifiers/    # one YAML per classifier
 │   └── experiments/    # one YAML per experiment protocol
-├── src/promptguard/
+├── src/loato_bench/
 │   ├── cli.py          # Typer CLI entrypoints
 │   ├── data/           # Dataset loaders, harmonization, taxonomy, splits
 │   ├── embeddings/     # Embedding model implementations + cache

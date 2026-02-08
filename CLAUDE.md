@@ -1,4 +1,4 @@
-# CLAUDE.md — PromptGuard-Lite
+# CLAUDE.md — LOATO-Bench
 
 ## What This Project Is
 
@@ -11,7 +11,7 @@ unified benchmark of ~20K+ samples from 5 public datasets.
 
 ```bash
 uv sync                                    # Install deps
-uv run promptguard --help                  # CLI help
+uv run loato-bench --help                  # CLI help
 uv run pytest tests/ -v                    # Run tests
 uv run ruff check src/ tests/              # Lint
 uv run ruff format src/ tests/             # Format
@@ -20,7 +20,7 @@ uv run ruff format src/ tests/             # Format
 ## Project Layout
 
 ```
-src/promptguard/
+src/loato_bench/
   cli.py              # Typer CLI — entrypoint is app_entry()
   data/               # Person A: loaders, harmonize, taxonomy, splits
     base.py           # UnifiedSample dataclass + DatasetLoader ABC

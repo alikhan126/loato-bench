@@ -6,8 +6,8 @@ import numpy as np
 from numpy.typing import NDArray
 from sentence_transformers import SentenceTransformer
 
-from promptguard.embeddings.base import EmbeddingModel
-from promptguard.utils.config import EmbeddingConfig
+from loato_bench.embeddings.base import EmbeddingModel
+from loato_bench.utils.config import EmbeddingConfig
 
 
 class SentenceTransformerEmbedding(EmbeddingModel):

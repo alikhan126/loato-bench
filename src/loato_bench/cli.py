@@ -1,4 +1,4 @@
-"""PromptGuard CLI — Typer entrypoints for all pipeline stages."""
+"""LOATO-Bench CLI — Typer entrypoints for all pipeline stages."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ import logging
 import typer
 from rich.console import Console
 
-from promptguard.utils.config import DATA_DIR
+from loato_bench.utils.config import DATA_DIR
 
 logger = logging.getLogger(__name__)
 console = Console()
 app = typer.Typer(
-    name="promptguard",
-    help="PromptGuard-Lite: Embedding-based prompt injection classifiers.",
+    name="loato-bench",
+    help="LOATO-Bench: Embedding-based prompt injection classifiers.",
     no_args_is_help=True,
 )
 
@@ -42,7 +42,7 @@ app.add_typer(analyze_app, name="analyze")
 @data_app.command()
 def download() -> None:
     """Download all raw datasets via HuggingFace."""
-    from promptguard.data import (
+    from loato_bench.data import (
         DeepsetLoader,
         GenTelLoader,
         HackaPromptLoader,
@@ -88,11 +88,11 @@ def harmonize() -> None:
     """Harmonize and deduplicate into unified parquet."""
     import pickle
 
-    from promptguard.data.harmonize import harmonize_samples
+    from loato_bench.data.harmonize import harmonize_samples
 
     raw_path = DATA_DIR / "raw" / "all_samples.pkl"
     if not raw_path.exists():
-        console.print("[red]No raw data found. Run 'promptguard data download' first.[/red]")
+        console.print("[red]No raw data found. Run 'loato-bench data download' first.[/red]")
         raise typer.Exit(1)
 
     console.print("[bold green]Loading raw samples...[/bold green]")
@@ -141,7 +141,7 @@ def embed_run(
     """Compute embeddings for one or all models."""
     import pandas as pd
 
-    from promptguard.embeddings import EmbeddingCache, compute_text_hash, get_embedding_model
+    from loato_bench.embeddings import EmbeddingCache, compute_text_hash, get_embedding_model
 
     models = EMBEDDING_MODELS if all_models else ([model] if model else [])
     if not models:
@@ -151,7 +151,7 @@ def embed_run(
     # Load processed dataset
     parquet_path = DATA_DIR / "processed" / "unified_dataset.parquet"
     if not parquet_path.exists():
-        console.print("[red]No processed data. Run 'promptguard data harmonize' first.[/red]")
+        console.print("[red]No processed data. Run 'loato-bench data harmonize' first.[/red]")
         raise typer.Exit(1)
 
     df = pd.read_parquet(parquet_path)
@@ -267,5 +267,5 @@ def report() -> None:
 
 
 def app_entry() -> None:
-    """Entry point called by `promptguard` CLI."""
+    """Entry point called by `loato-bench` CLI."""
     app()

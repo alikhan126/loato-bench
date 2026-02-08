@@ -2,7 +2,7 @@
 
 from typer.testing import CliRunner
 
-from promptguard.cli import app
+from loato_bench.cli import app
 
 runner = CliRunner()
 

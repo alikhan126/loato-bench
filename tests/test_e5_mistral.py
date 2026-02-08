@@ -5,14 +5,14 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from promptguard.embeddings.base import EmbeddingModel
-from promptguard.utils.config import EmbeddingConfig
+from loato_bench.embeddings.base import EmbeddingModel
+from loato_bench.utils.config import EmbeddingConfig
 
 # Provide mock modules so we can import E5MistralEmbedding even without llama-cpp-python
 sys.modules.setdefault("llama_cpp", MagicMock())
 sys.modules.setdefault("huggingface_hub", MagicMock())
 
-from promptguard.embeddings.e5_mistral import E5MistralEmbedding  # noqa: E402
+from loato_bench.embeddings.e5_mistral import E5MistralEmbedding  # noqa: E402
 
 
 def _e5_config() -> EmbeddingConfig:

@@ -22,7 +22,7 @@ def init_run(
     Group:    ``{experiment}_{embedding}_{classifier}``
     """
     return wandb.init(
-        project="promptguard-lite",
+        project="loato-bench",
         name=f"{experiment}_{embedding}_{classifier}_{fold}",
         group=f"{experiment}_{embedding}_{classifier}",
         tags=[experiment, embedding, classifier],

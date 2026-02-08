@@ -31,7 +31,7 @@ class EmbeddingCache:
     """
 
     def __init__(self, model_name: str, base_dir: Path | None = None) -> None:
-        from promptguard.utils.config import DATA_DIR
+        from loato_bench.utils.config import DATA_DIR
 
         if base_dir is None:
             base_dir = DATA_DIR / "embeddings"

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 # Project paths
 # ---------------------------------------------------------------------------
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]  # promptguard/
+PROJECT_ROOT = Path(__file__).resolve().parents[3]  # loato-bench/
 CONFIGS_DIR = PROJECT_ROOT / "configs"
 DATA_DIR = PROJECT_ROOT / "data"
 RESULTS_DIR = PROJECT_ROOT / "results"

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from promptguard.embeddings.base import EmbeddingModel
+from loato_bench.embeddings.base import EmbeddingModel
 
 
 def test_embedding_model_is_abstract():

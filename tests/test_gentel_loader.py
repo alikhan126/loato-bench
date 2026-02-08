@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from promptguard.data.base import DatasetLoader, UnifiedSample
-from promptguard.data.gentel import GenTelLoader
+from loato_bench.data.base import DatasetLoader, UnifiedSample
+from loato_bench.data.gentel import GenTelLoader
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -94,7 +94,7 @@ class TestGenTelLoaderContract:
 class TestGenTelLoaderLoad:
     """Test GenTelLoader.load() transforms GenTel-Bench data correctly."""
 
-    @patch("promptguard.data.gentel.load_dataset")
+    @patch("loato_bench.data.gentel.load_dataset")
     def test_returns_list_of_unified_samples(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         loader = GenTelLoader()
@@ -102,14 +102,14 @@ class TestGenTelLoaderLoad:
         assert isinstance(samples, list)
         assert all(isinstance(s, UnifiedSample) for s in samples)
 
-    @patch("promptguard.data.gentel.load_dataset")
+    @patch("loato_bench.data.gentel.load_dataset")
     def test_loads_all_rows(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         loader = GenTelLoader()
         samples = loader.load()
         assert len(samples) == 5
 
-    @patch("promptguard.data.gentel.load_dataset")
+    @patch("loato_bench.data.gentel.load_dataset")
     def test_preserves_text_and_label(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         loader = GenTelLoader()
@@ -119,7 +119,7 @@ class TestGenTelLoaderLoad:
         benign = [s for s in samples if s.label == 0]
         assert len(benign) == 2
 
-    @patch("promptguard.data.gentel.load_dataset")
+    @patch("loato_bench.data.gentel.load_dataset")
     def test_source_is_gentelbench(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         loader = GenTelLoader()
@@ -127,7 +127,7 @@ class TestGenTelLoaderLoad:
         for s in samples:
             assert s.source == "gentelbench"
 
-    @patch("promptguard.data.gentel.load_dataset")
+    @patch("loato_bench.data.gentel.load_dataset")
     def test_metadata_includes_domain_and_subdomain(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         loader = GenTelLoader()
@@ -136,7 +136,7 @@ class TestGenTelLoaderLoad:
             assert "domain" in s.metadata
             assert "subdomain" in s.metadata
 
-    @patch("promptguard.data.gentel.load_dataset")
+    @patch("loato_bench.data.gentel.load_dataset")
     def test_original_category_stores_subdomain(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         loader = GenTelLoader()
@@ -145,7 +145,7 @@ class TestGenTelLoaderLoad:
         assert "Cybercrime" in subdomains
         assert "Malware" in subdomains
 
-    @patch("promptguard.data.gentel.load_dataset")
+    @patch("loato_bench.data.gentel.load_dataset")
     def test_benign_have_no_original_category(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         loader = GenTelLoader()
@@ -154,7 +154,7 @@ class TestGenTelLoaderLoad:
             if s.label == 0:
                 assert s.original_category is None
 
-    @patch("promptguard.data.gentel.load_dataset")
+    @patch("loato_bench.data.gentel.load_dataset")
     def test_calls_load_dataset_with_correct_path(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         loader = GenTelLoader()
@@ -170,7 +170,7 @@ class TestGenTelLoaderLoad:
 class TestGenTelLoaderCap:
     """GenTel is large (~177K). Loader should support capping."""
 
-    @patch("promptguard.data.gentel.load_dataset")
+    @patch("loato_bench.data.gentel.load_dataset")
     def test_respects_max_samples(self, mock_load):
         rows = [
             {

@@ -2,8 +2,8 @@
 
 import pandas as pd
 
-from promptguard.data.base import UnifiedSample
-from promptguard.data.harmonize import (
+from loato_bench.data.base import UnifiedSample
+from loato_bench.data.harmonize import (
     detect_language,
     exact_dedup,
     harmonize_samples,
