@@ -4,9 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
-from promptguard.data.harmonize import detect_language
-from promptguard.embeddings import get_embedding_model
-from promptguard.embeddings.cache import EmbeddingCache
+from loato_bench.data.harmonize import detect_language
+from loato_bench.embeddings import get_embedding_model
+from loato_bench.embeddings.cache import EmbeddingCache
 
 
 class TestDetectLanguageEdgeCases:
@@ -19,7 +19,7 @@ class TestDetectLanguageEdgeCases:
         assert detect_language("   ") == "unknown"
 
     @patch(
-        "promptguard.data.harmonize.detect",
+        "loato_bench.data.harmonize.detect",
         side_effect=__import__(
             "langdetect.lang_detect_exception", fromlist=["LangDetectException"]
         ).LangDetectException(0, ""),
@@ -31,7 +31,7 @@ class TestDetectLanguageEdgeCases:
 class TestEmbeddingCacheDefaultBaseDir:
     """Cover the default base_dir fallback in EmbeddingCache.__init__ (line 37)."""
 
-    @patch("promptguard.utils.config.DATA_DIR")
+    @patch("loato_bench.utils.config.DATA_DIR")
     def test_default_base_dir_uses_data_dir(self, mock_data_dir, tmp_path):
         mock_data_dir.__truediv__ = lambda self, key: tmp_path / key
         cache = EmbeddingCache("test_model")
@@ -41,7 +41,7 @@ class TestEmbeddingCacheDefaultBaseDir:
 class TestGetEmbeddingModelUnknownLibrary:
     """Cover the ValueError branch in get_embedding_model (lines 33-35)."""
 
-    @patch("promptguard.embeddings.load_embedding_config")
+    @patch("loato_bench.embeddings.load_embedding_config")
     def test_unknown_library_raises_value_error(self, mock_config):
         mock_config.return_value.library = "nonexistent_lib"
         with pytest.raises(ValueError, match="Unknown embedding library"):

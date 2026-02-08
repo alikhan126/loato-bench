@@ -2,12 +2,12 @@
 
 from collections.abc import Callable
 
-from promptguard.embeddings.base import EmbeddingModel
-from promptguard.embeddings.cache import EmbeddingCache, compute_text_hash
-from promptguard.embeddings.instructor import InstructorEmbeddingModel
-from promptguard.embeddings.openai_embed import OpenAIEmbedding
-from promptguard.embeddings.sentence_tf import SentenceTransformerEmbedding
-from promptguard.utils.config import EmbeddingConfig, load_embedding_config
+from loato_bench.embeddings.base import EmbeddingModel
+from loato_bench.embeddings.cache import EmbeddingCache, compute_text_hash
+from loato_bench.embeddings.instructor import InstructorEmbeddingModel
+from loato_bench.embeddings.openai_embed import OpenAIEmbedding
+from loato_bench.embeddings.sentence_tf import SentenceTransformerEmbedding
+from loato_bench.utils.config import EmbeddingConfig, load_embedding_config
 
 # E5MistralEmbedding is imported lazily since it requires llama-cpp-python
 
@@ -27,7 +27,7 @@ def get_embedding_model(name: str) -> EmbeddingModel:
     config = load_embedding_config(name)
 
     if config.library == "llama-cpp-python":
-        from promptguard.embeddings.e5_mistral import E5MistralEmbedding
+        from loato_bench.embeddings.e5_mistral import E5MistralEmbedding
 
         return E5MistralEmbedding(config)
 

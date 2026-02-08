@@ -24,7 +24,7 @@ from datasketch import MinHash, MinHashLSH
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
 
-from promptguard.data.base import UnifiedSample
+from loato_bench.data.base import UnifiedSample
 
 logger = logging.getLogger(__name__)
 

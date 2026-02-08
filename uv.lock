@@ -1624,6 +1624,101 @@ wheels = [
 ]
 
 [[package]]
+name = "loato-bench"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "datasets" },
+    { name = "datasketch" },
+    { name = "instructorembedding" },
+    { name = "langdetect" },
+    { name = "llvmlite" },
+    { name = "matplotlib" },
+    { name = "numba" },
+    { name = "numpy" },
+    { name = "openai" },
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "seaborn" },
+    { name = "sentence-transformers" },
+    { name = "shap" },
+    { name = "statsmodels" },
+    { name = "tenacity" },
+    { name = "torch" },
+    { name = "tqdm" },
+    { name = "typer" },
+    { name = "umap-learn" },
+    { name = "wandb" },
+    { name = "xgboost" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ipykernel" },
+    { name = "jupyter" },
+    { name = "mypy" },
+    { name = "nbstripout" },
+    { name = "pandas-stubs" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "types-pyyaml" },
+    { name = "types-tqdm" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "datasets", specifier = ">=3.0" },
+    { name = "datasketch", specifier = ">=1.6" },
+    { name = "instructorembedding", specifier = ">=1.0" },
+    { name = "langdetect", specifier = ">=1.0" },
+    { name = "llvmlite", specifier = ">=0.42" },
+    { name = "matplotlib", specifier = ">=3.9" },
+    { name = "numba", specifier = ">=0.59" },
+    { name = "numpy", specifier = ">=1.26" },
+    { name = "openai", specifier = ">=1.40" },
+    { name = "pandas", specifier = ">=2.2" },
+    { name = "pyarrow", specifier = ">=17.0" },
+    { name = "pydantic", specifier = ">=2.8" },
+    { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rich", specifier = ">=13.7" },
+    { name = "scikit-learn", specifier = ">=1.5" },
+    { name = "scipy", specifier = ">=1.14" },
+    { name = "seaborn", specifier = ">=0.13" },
+    { name = "sentence-transformers", specifier = ">=3.0" },
+    { name = "shap", specifier = ">=0.45" },
+    { name = "statsmodels", specifier = ">=0.14" },
+    { name = "tenacity", specifier = ">=8.5" },
+    { name = "torch", specifier = ">=2.4" },
+    { name = "tqdm", specifier = ">=4.66" },
+    { name = "typer", specifier = ">=0.12" },
+    { name = "umap-learn", specifier = ">=0.5.7" },
+    { name = "wandb", specifier = ">=0.17" },
+    { name = "xgboost", specifier = ">=2.1" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ipykernel", specifier = ">=6.29" },
+    { name = "jupyter", specifier = ">=1.0" },
+    { name = "mypy", specifier = ">=1.13" },
+    { name = "nbstripout", specifier = ">=0.7" },
+    { name = "pandas-stubs", specifier = ">=2.2" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "ruff", specifier = ">=0.5" },
+    { name = "types-pyyaml", specifier = ">=6.0" },
+    { name = "types-tqdm", specifier = ">=4.66" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2533,101 +2628,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a1/96/06e01a7b38dce6fe1db213e061a4602dd6032a8a97ef6c1a862537732421/prompt_toolkit-3.0.52.tar.gz", hash = "sha256:28cde192929c8e7321de85de1ddbe736f1375148b02f2e17edd840042b1be855", size = 434198, upload-time = "2025-08-27T15:24:02.057Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/84/03/0d3ce49e2505ae70cf43bc5bb3033955d2fc9f932163e84dc0779cc47f48/prompt_toolkit-3.0.52-py3-none-any.whl", hash = "sha256:9aac639a3bbd33284347de5ad8d68ecc044b91a762dc39b7c21095fcd6a19955", size = 391431, upload-time = "2025-08-27T15:23:59.498Z" },
-]
-
-[[package]]
-name = "promptguard"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "datasets" },
-    { name = "datasketch" },
-    { name = "instructorembedding" },
-    { name = "langdetect" },
-    { name = "llvmlite" },
-    { name = "matplotlib" },
-    { name = "numba" },
-    { name = "numpy" },
-    { name = "openai" },
-    { name = "pandas" },
-    { name = "pyarrow" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "rich" },
-    { name = "scikit-learn" },
-    { name = "scipy" },
-    { name = "seaborn" },
-    { name = "sentence-transformers" },
-    { name = "shap" },
-    { name = "statsmodels" },
-    { name = "tenacity" },
-    { name = "torch" },
-    { name = "tqdm" },
-    { name = "typer" },
-    { name = "umap-learn" },
-    { name = "wandb" },
-    { name = "xgboost" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "ipykernel" },
-    { name = "jupyter" },
-    { name = "mypy" },
-    { name = "nbstripout" },
-    { name = "pandas-stubs" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "types-pyyaml" },
-    { name = "types-tqdm" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "datasets", specifier = ">=3.0" },
-    { name = "datasketch", specifier = ">=1.6" },
-    { name = "instructorembedding", specifier = ">=1.0" },
-    { name = "langdetect", specifier = ">=1.0" },
-    { name = "llvmlite", specifier = ">=0.42" },
-    { name = "matplotlib", specifier = ">=3.9" },
-    { name = "numba", specifier = ">=0.59" },
-    { name = "numpy", specifier = ">=1.26" },
-    { name = "openai", specifier = ">=1.40" },
-    { name = "pandas", specifier = ">=2.2" },
-    { name = "pyarrow", specifier = ">=17.0" },
-    { name = "pydantic", specifier = ">=2.8" },
-    { name = "python-dotenv", specifier = ">=1.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rich", specifier = ">=13.7" },
-    { name = "scikit-learn", specifier = ">=1.5" },
-    { name = "scipy", specifier = ">=1.14" },
-    { name = "seaborn", specifier = ">=0.13" },
-    { name = "sentence-transformers", specifier = ">=3.0" },
-    { name = "shap", specifier = ">=0.45" },
-    { name = "statsmodels", specifier = ">=0.14" },
-    { name = "tenacity", specifier = ">=8.5" },
-    { name = "torch", specifier = ">=2.4" },
-    { name = "tqdm", specifier = ">=4.66" },
-    { name = "typer", specifier = ">=0.12" },
-    { name = "umap-learn", specifier = ">=0.5.7" },
-    { name = "wandb", specifier = ">=0.17" },
-    { name = "xgboost", specifier = ">=2.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "ipykernel", specifier = ">=6.29" },
-    { name = "jupyter", specifier = ">=1.0" },
-    { name = "mypy", specifier = ">=1.13" },
-    { name = "nbstripout", specifier = ">=0.7" },
-    { name = "pandas-stubs", specifier = ">=2.2" },
-    { name = "pytest", specifier = ">=8.3" },
-    { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "ruff", specifier = ">=0.5" },
-    { name = "types-pyyaml", specifier = ">=6.0" },
-    { name = "types-tqdm", specifier = ">=4.66" },
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 """Tests for configuration loading."""
 
-from promptguard.utils.config import (
+from loato_bench.utils.config import (
     CONFIGS_DIR,
     PROJECT_ROOT,
     load_classifier_config,
@@ -10,7 +10,7 @@ from promptguard.utils.config import (
 
 
 def test_project_root_exists():
-    """PROJECT_ROOT should point to the promptguard package root."""
+    """PROJECT_ROOT should point to the loato-bench package root."""
     assert PROJECT_ROOT.exists()
     assert (PROJECT_ROOT / "pyproject.toml").exists()
 

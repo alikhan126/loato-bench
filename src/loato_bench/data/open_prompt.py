@@ -21,7 +21,7 @@ import logging
 
 from datasets import load_dataset
 
-from promptguard.data.base import DatasetLoader, UnifiedSample
+from loato_bench.data.base import DatasetLoader, UnifiedSample
 
 logger = logging.getLogger(__name__)
 

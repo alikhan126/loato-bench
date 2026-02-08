@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from promptguard.classifiers.base import Classifier
+from loato_bench.classifiers.base import Classifier
 
 
 def test_classifier_is_abstract():

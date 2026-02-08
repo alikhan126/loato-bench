@@ -4,7 +4,7 @@ import json
 
 import numpy as np
 
-from promptguard.embeddings.cache import EmbeddingCache, compute_text_hash
+from loato_bench.embeddings.cache import EmbeddingCache, compute_text_hash
 
 
 class TestComputeTextHash:

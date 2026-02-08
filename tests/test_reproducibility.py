@@ -6,7 +6,7 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
-from promptguard.utils.reproducibility import seed_everything
+from loato_bench.utils.reproducibility import seed_everything
 
 
 class TestSeedEverything:
@@ -47,26 +47,26 @@ class TestSeedEverything:
         b = random.random()
         assert a == b
 
-    @patch("promptguard.utils.reproducibility.torch.manual_seed")
-    @patch("promptguard.utils.reproducibility.torch.backends.mps.is_available", return_value=False)
-    @patch("promptguard.utils.reproducibility.torch.cuda.is_available", return_value=True)
-    @patch("promptguard.utils.reproducibility.torch.cuda.manual_seed_all")
+    @patch("loato_bench.utils.reproducibility.torch.manual_seed")
+    @patch("loato_bench.utils.reproducibility.torch.backends.mps.is_available", return_value=False)
+    @patch("loato_bench.utils.reproducibility.torch.cuda.is_available", return_value=True)
+    @patch("loato_bench.utils.reproducibility.torch.cuda.manual_seed_all")
     def test_cuda_seeded_when_available(self, mock_seed_all, mock_cuda, mock_mps, mock_manual):
         seed_everything(42)
         mock_seed_all.assert_called_once_with(42)
 
-    @patch("promptguard.utils.reproducibility.torch.manual_seed")
-    @patch("promptguard.utils.reproducibility.torch.cuda.is_available", return_value=False)
-    @patch("promptguard.utils.reproducibility.torch.backends.mps.is_available", return_value=True)
-    @patch("promptguard.utils.reproducibility.torch.mps.manual_seed")
+    @patch("loato_bench.utils.reproducibility.torch.manual_seed")
+    @patch("loato_bench.utils.reproducibility.torch.cuda.is_available", return_value=False)
+    @patch("loato_bench.utils.reproducibility.torch.backends.mps.is_available", return_value=True)
+    @patch("loato_bench.utils.reproducibility.torch.mps.manual_seed")
     def test_mps_seeded_when_available(self, mock_mps_seed, mock_mps, mock_cuda, mock_manual):
         seed_everything(42)
         mock_mps_seed.assert_called_once_with(42)
 
-    @patch("promptguard.utils.reproducibility.torch.manual_seed")
-    @patch("promptguard.utils.reproducibility.torch.backends.mps.is_available", return_value=False)
-    @patch("promptguard.utils.reproducibility.torch.cuda.is_available", return_value=False)
-    @patch("promptguard.utils.reproducibility.torch.cuda.manual_seed_all")
+    @patch("loato_bench.utils.reproducibility.torch.manual_seed")
+    @patch("loato_bench.utils.reproducibility.torch.backends.mps.is_available", return_value=False)
+    @patch("loato_bench.utils.reproducibility.torch.cuda.is_available", return_value=False)
+    @patch("loato_bench.utils.reproducibility.torch.cuda.manual_seed_all")
     def test_cuda_not_seeded_when_unavailable(
         self, mock_seed_all, mock_cuda, mock_mps, mock_manual
     ):

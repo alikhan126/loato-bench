@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from promptguard.data.base import DatasetLoader, UnifiedSample
-from promptguard.data.open_prompt import OpenPromptLoader
+from loato_bench.data.base import DatasetLoader, UnifiedSample
+from loato_bench.data.open_prompt import OpenPromptLoader
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -99,14 +99,14 @@ class TestOpenPromptLoaderContract:
 class TestOpenPromptLoaderLoad:
     """Test OpenPromptLoader.load() transforms data correctly."""
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_returns_list_of_unified_samples(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader().load()
         assert isinstance(samples, list)
         assert all(isinstance(s, UnifiedSample) for s in samples)
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_produces_both_benign_and_injection(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader().load()
@@ -114,7 +114,7 @@ class TestOpenPromptLoaderLoad:
         assert 0 in labels
         assert 1 in labels
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_injection_count_equals_row_count(self, mock_load, fake_hf_dataset):
         """Every row produces one injection sample."""
         mock_load.return_value = fake_hf_dataset
@@ -122,7 +122,7 @@ class TestOpenPromptLoaderLoad:
         injections = [s for s in samples if s.label == 1]
         assert len(injections) == 4  # 4 rows → 4 injection samples
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_benign_samples_are_deduplicated(self, mock_load, fake_hf_dataset):
         """Duplicate normal_input values produce only one benign sample."""
         mock_load.return_value = fake_hf_dataset
@@ -131,7 +131,7 @@ class TestOpenPromptLoaderLoad:
         # 4 rows but row 0 and row 3 share normal_input → 3 unique benign
         assert len(benign) == 3
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_injection_text_from_attack_input(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader().load()
@@ -139,7 +139,7 @@ class TestOpenPromptLoaderLoad:
         texts = [s.text for s in injections]
         assert any("Ignore previous instructions" in t for t in texts)
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_benign_text_from_normal_input(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader().load()
@@ -148,14 +148,14 @@ class TestOpenPromptLoaderLoad:
         assert "This movie was fantastic!" in texts
         assert "Win a free iPhone now!" in texts
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_source_is_open_prompt_injection(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader().load()
         for s in samples:
             assert s.source == "open_prompt_injection"
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_injection_samples_are_indirect(self, mock_load, fake_hf_dataset):
         """Injection samples are data-level (indirect) injections."""
         mock_load.return_value = fake_hf_dataset
@@ -164,7 +164,7 @@ class TestOpenPromptLoaderLoad:
             if s.label == 1:
                 assert s.is_indirect is True
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_benign_samples_are_not_indirect(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader().load()
@@ -172,7 +172,7 @@ class TestOpenPromptLoaderLoad:
             if s.label == 0:
                 assert s.is_indirect is False
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_original_category_is_attack_type(self, mock_load, fake_hf_dataset):
         """Injection samples store attack_type as original_category."""
         mock_load.return_value = fake_hf_dataset
@@ -181,7 +181,7 @@ class TestOpenPromptLoaderLoad:
         categories = {s.original_category for s in injections}
         assert categories == {"ignore", "fake_comp", "escape", "naive"}
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_benign_has_no_original_category(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader().load()
@@ -189,14 +189,14 @@ class TestOpenPromptLoaderLoad:
         for s in benign:
             assert s.original_category is None
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_metadata_includes_task_type(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader().load()
         for s in samples:
             assert "task_type" in s.metadata
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_injection_metadata_includes_injected_task(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader().load()
@@ -204,14 +204,14 @@ class TestOpenPromptLoaderLoad:
         for s in injections:
             assert "injected_task" in s.metadata
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_language_defaults_to_en(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader().load()
         for s in samples:
             assert s.language == "en"
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_calls_load_dataset_with_correct_path(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         OpenPromptLoader().load()
@@ -226,14 +226,14 @@ class TestOpenPromptLoaderLoad:
 class TestOpenPromptLoaderCap:
     """Tests for the max_samples parameter."""
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_respects_max_samples_for_injections(self, mock_load, fake_hf_dataset):
         mock_load.return_value = fake_hf_dataset
         samples = OpenPromptLoader(max_samples=2).load()
         injections = [s for s in samples if s.label == 1]
         assert len(injections) <= 2
 
-    @patch("promptguard.data.open_prompt.load_dataset")
+    @patch("loato_bench.data.open_prompt.load_dataset")
     def test_default_max_is_none(self, mock_load, fake_hf_dataset):
         """Default is no cap."""
         loader = OpenPromptLoader()

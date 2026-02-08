@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from promptguard.embeddings.base import EmbeddingModel
-from promptguard.embeddings.openai_embed import OpenAIEmbedding
-from promptguard.utils.config import EmbeddingConfig
+from loato_bench.embeddings.base import EmbeddingModel
+from loato_bench.embeddings.openai_embed import OpenAIEmbedding
+from loato_bench.utils.config import EmbeddingConfig
 
 
 def _openai_config() -> EmbeddingConfig:
@@ -37,12 +37,12 @@ class TestOpenAIEmbeddingContract:
     def test_is_subclass_of_embedding_model(self):
         assert issubclass(OpenAIEmbedding, EmbeddingModel)
 
-    @patch("promptguard.embeddings.openai_embed.openai.OpenAI")
+    @patch("loato_bench.embeddings.openai_embed.openai.OpenAI")
     def test_name_returns_config_name(self, mock_cls):
         model = OpenAIEmbedding(_openai_config())
         assert model.name == "openai_small"
 
-    @patch("promptguard.embeddings.openai_embed.openai.OpenAI")
+    @patch("loato_bench.embeddings.openai_embed.openai.OpenAI")
     def test_dim_returns_config_dim(self, mock_cls):
         model = OpenAIEmbedding(_openai_config())
         assert model.dim == 1536
@@ -51,7 +51,7 @@ class TestOpenAIEmbeddingContract:
 class TestOpenAIEmbeddingEncode:
     """Tests for the encode method."""
 
-    @patch("promptguard.embeddings.openai_embed.openai.OpenAI")
+    @patch("loato_bench.embeddings.openai_embed.openai.OpenAI")
     def test_output_shape_and_dtype(self, mock_cls):
         """encode() returns (N, 1536) float32."""
         mock_client = MagicMock()
@@ -65,7 +65,7 @@ class TestOpenAIEmbeddingEncode:
         assert out.shape == (3, 1536)
         assert out.dtype == np.float32
 
-    @patch("promptguard.embeddings.openai_embed.openai.OpenAI")
+    @patch("loato_bench.embeddings.openai_embed.openai.OpenAI")
     def test_calls_api_with_correct_model(self, mock_cls):
         """API call uses the model_id from config."""
         mock_client = MagicMock()
@@ -79,7 +79,7 @@ class TestOpenAIEmbeddingEncode:
         call_kwargs = mock_client.embeddings.create.call_args[1]
         assert call_kwargs["model"] == "text-embedding-3-small"
 
-    @patch("promptguard.embeddings.openai_embed.openai.OpenAI")
+    @patch("loato_bench.embeddings.openai_embed.openai.OpenAI")
     def test_batching(self, mock_cls):
         """10 texts with batch_size=3 produces 4 API calls."""
         mock_client = MagicMock()
@@ -97,7 +97,7 @@ class TestOpenAIEmbeddingEncode:
         assert mock_client.embeddings.create.call_count == 4  # ceil(10/3)
         assert out.shape == (10, 1536)
 
-    @patch("promptguard.embeddings.openai_embed.openai.OpenAI")
+    @patch("loato_bench.embeddings.openai_embed.openai.OpenAI")
     def test_single_text(self, mock_cls):
         """Works with one text."""
         mock_client = MagicMock()
@@ -109,7 +109,7 @@ class TestOpenAIEmbeddingEncode:
         out = model.encode(texts)
         assert out.shape == (1, 1536)
 
-    @patch("promptguard.embeddings.openai_embed.openai.OpenAI")
+    @patch("loato_bench.embeddings.openai_embed.openai.OpenAI")
     def test_empty_list(self, mock_cls):
         """Returns (0, dim) for empty input."""
         mock_client = MagicMock()
