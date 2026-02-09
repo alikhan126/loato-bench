@@ -6,7 +6,7 @@ clean, deduplicated pandas DataFrame ready for embedding and evaluation.
 Pipeline steps:
 1. Text normalization — NFC unicode, strip whitespace, collapse spaces
 2. Exact dedup — SHA-256 on normalized text (keep first occurrence)
-3. Near dedup — MinHash LSH, Jaccard threshold 0.85, word 3-grams
+3. Near dedup — MinHash LSH, Jaccard threshold 0.90, word 5-grams
 4. Language detection — ``langdetect`` on all samples
 5. Output — pandas DataFrame (saved as parquet by CLI)
 """
@@ -103,7 +103,7 @@ def exact_dedup(samples: list[UnifiedSample]) -> list[UnifiedSample]:
 # ---------------------------------------------------------------------------
 
 
-def _word_ngrams(text: str, n: int = 3) -> list[str]:
+def _word_ngrams(text: str, n: int = 5) -> list[str]:
     """Generate word n-grams from text."""
     words = text.lower().split()
     if len(words) < n:
@@ -113,12 +113,12 @@ def _word_ngrams(text: str, n: int = 3) -> list[str]:
 
 def near_dedup(
     samples: list[UnifiedSample],
-    threshold: float = 0.85,
+    threshold: float = 0.90,
     num_perm: int = 128,
 ) -> list[UnifiedSample]:
     """Remove near-duplicates using MinHash LSH with Jaccard similarity.
 
-    Uses word 3-grams as shingles for MinHash computation.
+    Uses word 5-grams as shingles for MinHash computation.
 
     Parameters
     ----------
@@ -244,7 +244,7 @@ def samples_to_dataframe(samples: list[UnifiedSample]) -> pd.DataFrame:
 
 def harmonize_samples(
     samples: list[UnifiedSample],
-    near_dedup_threshold: float = 0.85,
+    near_dedup_threshold: float = 0.90,
 ) -> pd.DataFrame:
     """Run the full harmonization pipeline on a list of UnifiedSample.
 

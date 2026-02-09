@@ -117,7 +117,7 @@ tests/                # pytest suite (107 tests passing)
 ## Key Design Decisions
 
 ### Data Pipeline (Sprint 1A - COMPLETE)
-- **Harmonization**: NFC unicode → exact dedup (SHA-256) → near dedup (MinHash LSH, Jaccard 0.85) → language detection
+- **Harmonization**: NFC unicode → exact dedup (SHA-256) → near dedup (MinHash LSH, Jaccard 0.90, word 5-grams) → language detection
 - **GenTel Quality Gate**: Heuristic injection confidence scoring (0-1) using keyword matching. Threshold=0.4, cap at 5K samples
 - **Taxonomy**: 3-tier mapping system
   - Tier 1: Source-specific mappings (e.g., Open-Prompt "jailbreak" → `jailbreak_roleplay`)
