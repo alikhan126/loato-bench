@@ -1,0 +1,9 @@
+# LLM provider configuration
+# Used by: Tier 3 taxonomy mapping (Sprint 2A), LLM baseline evaluation (Sprint 4A)
+
+llm:
+  provider: "anthropic"          # "anthropic" or "openai"
+  model: "claude-sonnet-4-5-20250929"  # or "gpt-4o-mini"
+  temperature: 0.0
+  max_tokens: 256
+  max_retries: 5                 # tenacity retry attempts on rate-limit
