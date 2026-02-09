@@ -236,7 +236,7 @@ def sweep_run(
 @analyze_app.command()
 def eda(
     output_dir: str = typer.Option(
-        "results/eda",
+        "eda",
         "--output-dir",
         "-o",
         help="Output directory for figures and reports.",

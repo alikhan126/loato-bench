@@ -98,16 +98,21 @@ class TestNearDedup:
     """Test near-duplicate detection via MinHash LSH."""
 
     def test_removes_near_duplicates(self):
-        # Use long, highly overlapping texts to produce many shared 3-grams
+        # Use identical texts with only the last word changed to ensure
+        # high Jaccard similarity even with word 5-grams
         base = (
             "the quick brown fox jumps over the lazy dog in the park "
             "near the river where children play and birds sing loudly "
-            "every single morning during the warm summer months"
+            "every single morning during the warm summer months when "
+            "the sun rises early and the flowers bloom beautifully in "
+            "the garden behind the old stone house on the hilltop today"
         )
         variant = (
             "the quick brown fox jumps over the lazy dog in the park "
             "near the river where children play and birds sing loudly "
-            "every single evening during the warm summer months"
+            "every single morning during the warm summer months when "
+            "the sun rises early and the flowers bloom beautifully in "
+            "the garden behind the old stone house on the hilltop yesterday"
         )
         samples = [
             UnifiedSample(text=base, label=0, source="a"),
