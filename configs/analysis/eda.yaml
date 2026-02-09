@@ -1,0 +1,93 @@
+# EDA Configuration
+# Parameters for exploratory data analysis, GenTel filtering, and visualization
+
+# GenTel-Bench quality gate settings
+gentel_filtering:
+  # Injection keywords for confidence scoring (case-insensitive)
+  injection_keywords:
+    - "ignore"
+    - "disregard"
+    - "override"
+    - "prompt injection"
+    - "jailbreak"
+    - "bypass"
+    - "system prompt"
+    - "instructions"
+    - "pretend"
+    - "roleplay"
+    - "act as"
+    - "new instruction"
+    - "ignore previous"
+    - "disregard above"
+    - "forget everything"
+    - "new task"
+    - "actually"
+    - "instead"
+    - "however"
+    - "but really"
+    - "translate to"
+    - "execute"
+    - "run code"
+    - "eval"
+
+  # Minimum injection confidence score to keep (0-1 scale)
+  # 0.4 = medium confidence threshold based on pilot analysis
+  confidence_threshold: 0.4
+
+  # Maximum GenTel samples to retain (top-scored samples kept)
+  max_samples: 5000
+
+# Text analysis settings
+text_analysis:
+  # Length bins for histogram visualization (in characters)
+  length_bins:
+    - 0
+    - 50
+    - 100
+    - 200
+    - 500
+    - 1000
+    - 2000
+    - 5000
+
+  # Outlier thresholds
+  min_length: 10      # Flag texts shorter than this
+  max_length: 5000    # Flag texts longer than this
+
+  # Suspicious pattern detection
+  all_caps_threshold: 0.8  # Flag if >80% uppercase letters
+
+# Visualization settings
+visualization:
+  # Figure size (width, height) in inches
+  figsize:
+    - 12
+    - 8
+
+  # DPI for saved figures
+  dpi: 150
+
+  # Color palette (seaborn style)
+  palette: "Set2"
+
+  # Font sizes
+  title_fontsize: 16
+  label_fontsize: 12
+  tick_fontsize: 10
+
+  # Output format for saved figures
+  format: "png"
+
+# Split feasibility thresholds (for green/yellow/red matrix)
+split_feasibility:
+  # LOATO: minimum samples per attack category
+  loato_min_samples: 200
+
+  # Direct → Indirect: minimum indirect samples
+  indirect_min_samples: 500
+
+  # Cross-lingual: minimum non-English samples per language
+  crosslingual_min_samples: 300
+
+  # Standard CV: minimum samples per class for stratification
+  cv_min_per_class: 50
