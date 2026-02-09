@@ -236,26 +236,41 @@ Merge rule: Categories with <50 samples after EDA get merged into larger categor
 - Coverage exemptions: `cli.py`, `classifiers/*`, `evaluation/*` are currently stub/incomplete (Sprint 2B+)
 - EDA `analysis/*` modules are NOW COVERED (no longer exempt) — maintain 90%+ coverage
 
-## Code Quality Standards (Enforced)
+## Code Quality Standards (Enforced — Two Layers)
+
+### Layer 1: Pre-commit Hooks (local, every commit)
+
+Pre-commit runs automatically on `git commit`. Hooks installed via:
+```bash
+uv run pre-commit install           # One-time setup (already done)
+uv run pre-commit run --all-files   # Manual run on all files
+```
+
+**Hooks** (in order):
+1. **File hygiene** — trailing whitespace, end-of-file fix, YAML/TOML check, large file check, merge conflicts, debug statements
+2. **Ruff lint** — auto-fixes and fails on remaining errors (`--fix --exit-non-zero-on-fix`)
+3. **Ruff format** — auto-formats Python and Jupyter files
+4. **mypy** — type checking (strict mode, via `uv run mypy`)
+5. **detect-secrets** — prevents accidental secret commits (baseline: `.secrets.baseline`)
+
+### Layer 2: CI Pipeline (GitHub Actions, every PR)
 
 ```bash
-# Type checking (must pass)
-uv run mypy src/loato_bench/
+# These mirror pre-commit but run independently on CI
+uv run mypy                                    # Type check job
+uv run ruff check src/ tests/                  # Lint job
+uv run ruff format --check src/ tests/         # Lint job
+uv run pytest tests/ -v --tb=short --cov       # Test job
+```
 
-# Linting (must pass)
-uv run ruff check src/ tests/
+### Quick Commands
 
-# Formatting (auto-fix)
-uv run ruff format src/ tests/
-
+```bash
 # Tests (must pass with ≥90% coverage for non-exempt modules)
 uv run pytest tests/ --cov=loato_bench --cov-report=term
 
-# Full QA pipeline (run before commits)
-uv run mypy src/loato_bench/ && \
-uv run ruff check src/ tests/ && \
-uv run ruff format src/ tests/ && \
-uv run pytest tests/ -v
+# Full QA (pre-commit + tests)
+uv run pre-commit run --all-files && uv run pytest tests/ -v
 ```
 
 ## Important Files to Check

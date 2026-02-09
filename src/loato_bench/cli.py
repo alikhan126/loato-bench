@@ -252,7 +252,7 @@ def eda(
     from loato_bench.analysis import quality, visualization
     from loato_bench.data import taxonomy
     from loato_bench.tracking import wandb_utils
-    from loato_bench.utils.config import DATA_DIR, RESULTS_DIR
+    from loato_bench.utils.config import RESULTS_DIR
 
     console.print("[bold green]Running Exploratory Data Analysis...[/bold green]")
 
@@ -308,9 +308,7 @@ def eda(
     # GenTel quality report
     gentel_report_path = output_path / "gentel_quality_report.json"
     with open(gentel_report_path, "w") as f:
-        json.dump(
-            {"issues": gentel_issues, "filtering": gentel_filter}, f, indent=2
-        )
+        json.dump({"issues": gentel_issues, "filtering": gentel_filter}, f, indent=2)
     reports["gentel_quality_report.json"] = gentel_report_path
 
     # Taxonomy coverage report

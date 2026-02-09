@@ -91,9 +91,9 @@ def log_eda_artifacts(
         if isinstance(value, dict):
             # Flatten nested dicts
             for sub_key, sub_value in value.items():
-                if isinstance(sub_value, (int, float, str, bool)):
+                if isinstance(sub_value, int | float | str | bool):
                     run.summary[f"{key}/{sub_key}"] = sub_value
-        elif isinstance(value, (int, float, str, bool)):
+        elif isinstance(value, int | float | str | bool):
             run.summary[key] = value
 
     # Log figures as artifacts
