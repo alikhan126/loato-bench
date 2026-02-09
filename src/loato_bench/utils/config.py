@@ -47,6 +47,16 @@ class ClassifierConfig(BaseModel):
     sweep: dict[str, list[Any]] = {}
 
 
+class LLMConfig(BaseModel):
+    """Configuration for an LLM provider."""
+
+    provider: str  # "anthropic" or "openai"
+    model: str
+    temperature: float = 0.0
+    max_tokens: int = 256
+    max_retries: int = 5
+
+
 class ExperimentConfig(BaseModel):
     """Configuration for an experiment."""
 
@@ -88,6 +98,13 @@ def load_classifier_config(name: str) -> ClassifierConfig:
         hyperparams=raw.get("hyperparams", {}),
         sweep=raw.get("sweep", {}),
     )
+
+
+def load_llm_config() -> LLMConfig:
+    """Load LLM provider config from configs/llm.yaml."""
+    path = CONFIGS_DIR / "llm.yaml"
+    data = load_yaml(path)
+    return LLMConfig(**data["llm"])
 
 
 def load_experiment_config(name: str) -> ExperimentConfig:
