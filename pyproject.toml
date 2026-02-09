@@ -23,6 +23,7 @@ dependencies = [
     "sentence-transformers>=3.0",
     "InstructorEmbedding>=1.0",
     "openai>=1.40",
+    "anthropic>=0.40",
     # DL backend
     "torch>=2.4",
     # Tracking
@@ -89,6 +90,7 @@ omit = [
     "src/loato_bench/classifiers/*",
     "src/loato_bench/evaluation/*",
     "src/loato_bench/analysis/*",
+    "src/loato_bench/llm/*",
 ]
 
 [tool.coverage.report]
@@ -102,6 +104,7 @@ omit = [
     "src/loato_bench/classifiers/*",
     "src/loato_bench/evaluation/*",
     "src/loato_bench/analysis/*",
+    "src/loato_bench/llm/*",
 ]
 fail_under = 90
 
@@ -133,5 +136,6 @@ module = [
     "numba.*",
     "llvmlite.*",
     "xgboost.*",
+    "anthropic.*",
 ]
 ignore_missing_imports = true
