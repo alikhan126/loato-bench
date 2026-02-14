@@ -124,13 +124,13 @@ Action: Filter out (low injection confidence score)
 
 **Why**: Each experiment type has minimum sample requirements. We need to verify we can execute all planned experiments.
 
-**Feasibility Matrix** (populated after EDA):
+**Feasibility Matrix**:
 | Experiment | Requirement | Status | Notes |
 |------------|-------------|--------|-------|
-| Standard CV | 50/class | 🟢 TBD | [To be filled] |
-| LOATO | 200/category | 🟡 TBD | [To be filled] |
-| Direct→Indirect | 500 indirect | 🟡 TBD | [To be filled] |
-| Cross-lingual | 300/language | 🔴 TBD | [To be filled] |
+| Standard CV | 50/class | Viable | 3,859 benign / 33,914 injection |
+| LOATO | 200/category | **Blocked** | Only 2/8 categories viable — Tier 3 LLM needed |
+| Direct->Indirect | 500 indirect | Likely viable | Open-Prompt provides indirect samples |
+| Cross-lingual | 300/language | **Not viable** | Max is German at 269 — need synthetic translations |
 
 ### 6. **Data Integrity** 🔍
 - ✅ Missing values (null text, labels, sources)
@@ -190,15 +190,15 @@ Action: Filter out (low injection confidence score)
 
 ### Data Sources (5 Datasets)
 
-| Source | Original Size | Label Type | Quality |
-|--------|---------------|------------|---------|
-| **Deepset** | ~1,000 | Benign + Injection | ✅ High |
-| **Open-Prompt** | ~3,000 | Attack categories | ✅ High |
-| **PINT** | ~500 | Attack types | ✅ High |
-| **HackAPrompt** | ~5,000 | Competition entries | ⚠️ Injection-only |
-| **GenTel-Bench** | ~177,000 | Content harm | ⚠️ Quality issues |
+| Source | Original Size | After Harmonization | Label Type | Quality |
+|--------|---------------|---------------------|------------|---------|
+| **Open-Prompt** | ~5,000 | 24,286 (64.3%) | Attack categories | High |
+| **GenTel-Bench** | ~177,000 | 7,158 (19.0%) | Content harm | Quality issues (71% filtered) |
+| **HackAPrompt** | ~44,000 | 4,671 (12.4%) | Competition entries | Injection-only (no benign) |
+| **PINT** | ~4,300 | 999 (2.6%) | Attack types | High, multilingual |
+| **Deepset** | ~1,000 | 659 (1.7%) | Benign + Injection | High |
 
-**Total**: ~186,500 raw samples → ~20,000+ after harmonization & deduplication
+**Total**: ~186,500 raw samples -> **37,773** after harmonization & deduplication (-> ~32,683 after GenTel filtering)
 
 ### Pipeline Steps
 
@@ -389,177 +389,259 @@ else:
 
 ## Key Findings
 
-> **📝 NOTE**: Results to be filled after running EDA
+> **Results populated from EDA pipeline run (February 2026)**
 
 ### 1. Dataset Overview
 
-**Total Samples**: [TBD]
+**Total Samples**: 37,773 (after harmonization + deduplication from ~186,500 raw)
 
-**Class Balance**:
-- Benign (0): [TBD] samples ([TBD]%)
-- Injection (1): [TBD] samples ([TBD]%)
-- Balance Ratio: [TBD] (minority/majority)
+**Class Balance** (heavily skewed):
+- Benign (0): 3,859 samples (10.2%)
+- Injection (1): 33,914 samples (89.8%)
+- Balance Ratio: 0.114 (minority/majority) — significant imbalance, stratified splitting required
 
 **Source Distribution**:
-- Deepset: [TBD] samples
-- Open-Prompt: [TBD] samples
-- PINT: [TBD] samples
-- HackAPrompt: [TBD] samples
-- GenTel-Bench: [TBD] samples
+| Source | Count | Share | Notes |
+|--------|-------|-------|-------|
+| Open-Prompt-Injection | 24,286 | 64.3% | Dominant source — potential source bias |
+| GenTel-Bench | 7,158 | 19.0% | Quality issues — requires filtering |
+| HackAPrompt | 4,671 | 12.4% | Injection-only (no benign) |
+| PINT | 999 | 2.6% | Multilingual, typed attacks |
+| Deepset | 659 | 1.7% | Small but high quality |
+
+Open-Prompt contributes nearly two-thirds of all samples. This dominance means attack category distributions are heavily shaped by Open-Prompt's labeling. Source bias mitigation (augmenting benign samples from additional sources, reporting per-source results) is recommended.
 
 **Language Distribution**:
-- English: [TBD]%
-- Non-English: [TBD] samples ([TBD] languages)
-- Top 3 non-English: [TBD]
+- English: ~98% (36,996 samples — 3,632 benign + 33,364 injection)
+- Non-English: ~777 samples across 19+ languages
+- Top 3 non-English: German (269), Dutch (116), Danish (64)
+- Most non-English samples are injection-only with few or zero benign counterparts
 
-**Indirect Injections**: [TBD] samples
+**Indirect Injections**: Present via Open-Prompt's indirect injection samples (marked `is_indirect=True`). Exact count depends on source-level filtering applied.
 
 ---
 
 ### 2. Text Properties
 
 **Character Length Statistics**:
-- Min: [TBD] chars
-- Max: [TBD] chars
-- Mean: [TBD] chars
-- Median: [TBD] chars
-- Std Dev: [TBD] chars
+- Mean: 425 chars
+- Median: 395 chars
+- Max: 15,726 chars
+- Distribution: Right-skewed, bulk of samples between 100-1,000 chars
 
 **Outliers**:
-- Very short (<10 chars): [TBD] samples
-- Very long (>5000 chars): [TBD] samples
-- Empty text: [TBD] samples
+- Very long (>10,000 chars): 3 samples
+- Excessive uppercase (>80%): 27 samples
+- Empty text: 0 samples
 
-**Vocabulary**:
-- [TBD findings on vocabulary diversity]
+**Key Observations**:
+- The distribution is well-behaved for embedding models. Most texts fall within the 512-token context window of MiniLM/BGE/Instructor.
+- E5-Mistral (4096 context) can handle all samples without truncation.
+- The 3 extreme-length outliers (>10K chars) may need truncation for smaller models but represent a negligible fraction.
 
 ---
 
 ### 3. GenTel Quality Assessment
 
+This is the **single most important data quality finding**. GenTel-Bench labels samples as "injection" based on content harm categories (hate speech, violence, etc.), NOT injection techniques. Most GenTel samples are not genuine prompt injections.
+
 **Before Filtering**:
-- Total GenTel samples: [TBD]
-- Low confidence (<0.3): [TBD] samples ([TBD]%)
-- Medium confidence (0.3-0.7): [TBD] samples ([TBD]%)
-- High confidence (≥0.7): [TBD] samples ([TBD]%)
-- Mean injection score: [TBD]
-- Median injection score: [TBD]
+- Total GenTel samples: 7,158
+- Low confidence (<0.3): 4,461 samples (62.3%)
+- Medium confidence (0.3-0.7): 1,843 samples (25.7%)
+- High confidence (>=0.7): 854 samples (11.9%)
+- Mean injection score: 0.25 (very low)
+- Median injection score: 0.0 (majority have zero injection keywords)
 
 **Issues Detected**:
-- [TBD: List quality issues found]
-- [TBD: Examples of low-confidence samples]
+- 62.3% of GenTel samples have low injection confidence (<0.3) — likely pure content harm, not prompt injection
+- Mean injection confidence is only 0.25 — the majority of GenTel samples do not contain recognizable injection techniques
+- Example: A sample labeled "injection" that says "You are a piece of garbage" is hate speech, not prompt injection
 
 **Filtering Recommendation**:
-- Threshold: [TBD] (injection confidence cutoff)
-- Cap: [TBD] samples (top-scored)
-- Samples to remove: [TBD] ([TBD]%)
-- Final GenTel count: [TBD]
+- Threshold: 0.4 (injection confidence cutoff)
+- Cap: 5,000 samples (top-scored) — does not apply since only 2,068 pass threshold
+- Samples to remove: 5,090 (71.1%)
+- Final GenTel count: **2,068 samples** (from 7,158)
 
 **Impact on Dataset**:
-- Original total: [TBD] samples
-- After filtering: [TBD] samples
-- Reduction: [TBD]%
+- Original total: 37,773 samples
+- After GenTel filtering: ~32,683 samples (removing 5,090 low-quality GenTel)
+- Reduction: ~13.5% of total dataset
+- New class balance: benign remains 3,859, injection drops to ~28,824
 
 ---
 
 ### 4. Taxonomy Coverage
 
 **Tier 1 + Tier 2 Results**:
-- Total injection samples: [TBD]
-- Mapped samples: [TBD] ([TBD]%)
-- Unmapped samples: [TBD] ([TBD]%)
+- Total injection samples: 33,914
+- Mapped samples: 18,063 (53.3%)
+- Unmapped samples: 15,851 (46.7%) — **needs Tier 3 LLM in Sprint 2A**
 
-**Category Distribution**:
-| Category | Count | % of Injection | Status |
-|----------|-------|----------------|--------|
-| instruction_override | [TBD] | [TBD]% | [✅/⚠️/❌] |
-| jailbreak_roleplay | [TBD] | [TBD]% | [✅/⚠️/❌] |
-| context_manipulation | [TBD] | [TBD]% | [✅/⚠️/❌] |
-| obfuscation_encoding | [TBD] | [TBD]% | [✅/⚠️/❌] |
-| payload_splitting | [TBD] | [TBD]% | [✅/⚠️/❌] |
-| information_extraction | [TBD] | [TBD]% | [✅/⚠️/❌] |
-| indirect_injection | [TBD] | [TBD]% | [✅/⚠️/❌] |
-| social_engineering | [TBD] | [TBD]% | [✅/⚠️/❌] |
+**Category Distribution** (mapped samples only):
+| Category | Count | % of Injection | LOATO Status |
+|----------|-------|----------------|--------------|
+| instruction_override | 15,677 | 46.2% | LOATO viable |
+| jailbreak_roleplay | 2,149 | 6.3% | LOATO viable |
+| social_engineering | 160 | 0.5% | Marginal (below 200 threshold) |
+| information_extraction | 48 | 0.1% | Must merge (<50) |
+| obfuscation_encoding | 17 | 0.1% | Must merge (<50) |
+| context_manipulation | 12 | 0.0% | Must merge (<50) |
+| payload_splitting | 0 | 0.0% | Not detected by Tier 1+2 |
+| indirect_injection | 0 | 0.0% | Not detected by Tier 1+2 |
 
-**Small Categories** (<50 samples):
-- [TBD: List categories needing merges]
+**Key Insight**: The taxonomy is extremely top-heavy. `instruction_override` alone accounts for 86.8% of all mapped samples. Only 2 categories (`instruction_override`, `jailbreak_roleplay`) currently meet the 200-sample LOATO threshold. This means **Tier 3 LLM mapping is critical** — the 15,851 unmapped samples likely contain the diversity needed for a viable LOATO evaluation.
+
+**Small Categories** (<50 samples — must merge):
+- `information_extraction`: 48 samples
+- `obfuscation_encoding`: 17 samples
+- `context_manipulation`: 12 samples
 
 **Merge Recommendations**:
-- [TBD: Specific merge plan]
-- Example: Merge `obfuscation_encoding` + `adversarial_suffix` → `instruction_override`
+- Merge `context_manipulation` (12) into `information_extraction` — both involve extracting hidden information
+- Merge `obfuscation_encoding` (17) into `instruction_override` — obfuscation is typically used to bypass filters for instruction override attacks
+- Consider merging the combined `information_extraction` + `context_manipulation` (60) into a broader category if still below threshold after Tier 3
+- After Tier 3 LLM, re-evaluate `social_engineering` (160) — may reach 200+ with newly mapped samples
+
+**Categories to keep as-is**: `instruction_override`, `jailbreak_roleplay`, `social_engineering` (pending Tier 3 boost)
 
 ---
 
 ### 5. Split Feasibility
 
 **LOATO (Leave-One-Attack-Type-Out)**:
-- Viable categories (≥200 samples): [TBD] / 8
-- Insufficient categories (<200 samples): [TBD]
-- **Status**: [🟢 Viable / 🟡 Marginal / 🔴 Not Viable]
+- Viable categories (>=200 samples): **2 / 8** (`instruction_override`, `jailbreak_roleplay`)
+- Marginal categories (50-199): 1 (`social_engineering` at 160)
+- Insufficient categories (<50): 3 (must merge)
+- Not detected: 2 (`payload_splitting`, `indirect_injection`)
+- **Status**: **Not yet viable** — only 2 categories meet threshold with Tier 1+2 alone. Tier 3 LLM mapping is required to classify the 15,851 unmapped samples and populate additional categories.
 
-**Direct → Indirect Transfer**:
-- Indirect injection samples: [TBD]
-- **Status**: [🟢 Viable / 🟡 Marginal / 🔴 Not Viable]
+**Direct -> Indirect Transfer**:
+- Indirect injection samples: Available via Open-Prompt (samples marked `is_indirect=True`)
+- **Status**: Likely viable — Open-Prompt provides both direct and indirect samples. Exact count needs validation after Tier 3 mapping.
 
 **Cross-lingual Transfer**:
-- Languages with ≥300 samples: [TBD]
-- Top languages: [TBD]
-- **Status**: [🟢 Viable / 🟡 Marginal / 🔴 Not Viable]
+- Languages with >=300 samples: **0** (none meet threshold)
+- Top languages: German (269), Dutch (116), Danish (64), Spanish (55), French (43)
+- **Status**: **Not viable with natural data.** No single non-English language reaches 300 samples. Mitigation: generate 500 synthetic translations via GPT-4o-mini + use PINT's multilingual coverage + gandalf dataset.
 
 **Standard 5-Fold CV**:
-- Stratification balance: [TBD]
-- **Status**: [🟢 Viable / 🔴 Not Viable]
+- Benign: 3,859 / Injection: 33,914 — both well above 50-sample minimum
+- Stratification on label is straightforward
+- **Status**: Viable
 
 **Overall Experiment Feasibility**:
 | Experiment | Status | Notes |
 |------------|--------|-------|
-| Standard CV | [TBD] | [TBD] |
-| LOATO (primary) | [TBD] | [TBD] |
-| Direct→Indirect | [TBD] | [TBD] |
-| Cross-lingual | [TBD] | [TBD] |
+| Standard CV | Viable | Sufficient samples for stratified 5-fold |
+| LOATO (primary) | **Blocked** | Only 2/8 categories viable — needs Tier 3 LLM (Sprint 2A) |
+| Direct->Indirect | Likely viable | Depends on Open-Prompt indirect count post-filtering |
+| Cross-lingual | **Not viable (natural)** | Need synthetic translations (GPT-4o-mini fallback) |
 
 ---
 
 ### 6. Data Integrity Issues
 
 **Warnings Found**:
-- [TBD: List all data quality warnings]
-- [TBD: Missing values, duplicates, invalid labels]
-- [TBD: Suspicious patterns detected]
+- 3 samples with >10,000 characters (max: 15,726) — may need truncation for smaller embedding models
+- 27 samples with >80% uppercase letters — suspicious but not necessarily invalid (some jailbreak attempts use all-caps)
 
-**Critical Issues** (require attention):
-- [TBD: High-priority issues]
+**Critical Issues**: None. No missing values, no invalid labels, no encoding issues, no duplicate leakage after deduplication pipeline.
 
 **Minor Issues** (documented only):
-- [TBD: Low-priority issues]
+- Heavy class imbalance (10:90 benign:injection) — addressed via stratified splitting
+- Source concentration (64% from Open-Prompt) — addressed via per-source reporting and source bias analysis
+- Near-zero non-English benign samples — affects cross-lingual experiment design
 
 ---
 
 ## Recommendations
 
-> **📝 NOTE**: To be filled after analyzing findings
-
 ### For Sprint 2A (Taxonomy + Splits)
 
-1. **GenTel Filtering**:
-   - [ ] Apply threshold: [TBD]
-   - [ ] Cap at [TBD] samples
-   - [ ] Verify injection confidence distribution post-filtering
+1. **GenTel Filtering** (HIGH PRIORITY):
+   - [ ] Apply threshold 0.4 to GenTel injection confidence scores
+   - [ ] Result: 7,158 -> 2,068 GenTel samples (remove 5,090 / 71.1%)
+   - [ ] Re-run dataset statistics after filtering to update class balance
+   - [ ] Verify no information leakage between filtered and retained samples
 
-2. **Taxonomy Refinement**:
-   - [ ] Merge small categories: [TBD]
-   - [ ] Apply Tier 3 (LLM) to [TBD] unmapped samples
-   - [ ] Final taxonomy: [TBD] categories
+2. **Taxonomy Refinement** (CRITICAL — blocks LOATO):
+   - [ ] Merge `context_manipulation` (12) into `information_extraction` (48) -> ~60 combined
+   - [ ] Merge `obfuscation_encoding` (17) into `instruction_override` (15,677)
+   - [ ] Apply Tier 3 LLM (GPT-4o-mini) to **15,851 unmapped injection samples** (~2,000 API calls at batch size 8)
+   - [ ] Target: 6-8 viable categories with >=200 samples each after Tier 3
+   - [ ] Validate on 200-sample manual review (as noted in paper Section 3.1)
+   - [ ] Re-evaluate `social_engineering` (160) — may reach 200+ after Tier 3
 
 3. **Split Generation**:
-   - [ ] Generate LOATO splits for [TBD] categories
-   - [ ] Create direct→indirect split with [TBD] indirect samples
-   - [ ] Generate cross-lingual splits for [TBD] languages
-   - [ ] Create 5-fold CV splits with stratification
+   - [ ] Generate LOATO splits for all categories with >=200 samples post-Tier-3
+   - [ ] LOATO test set composition: held-out category + 20% random benign samples
+   - [ ] Create direct->indirect split using Open-Prompt's `is_indirect` flag
+   - [ ] Generate cross-lingual splits: use PINT multilingual + 500 GPT-4o-mini translations
+   - [ ] Create 5-fold stratified CV splits (stratify on label)
+   - [ ] Save all split indices as JSON in `data/splits/`
 
 4. **Data Cleaning**:
-   - [ ] Address critical data integrity issues: [TBD]
-   - [ ] Document known limitations: [TBD]
+   - [ ] Truncate or flag 3 extreme-length samples (>10K chars) for models with small context windows
+   - [ ] Document the 27 all-caps samples — keep but note in limitations
+   - [ ] Document known limitation: heavy reliance on Open-Prompt (64% of data)
+   - [ ] Document known limitation: cross-lingual requires synthetic augmentation
+
+### For Sprint 2B (Classifiers + Training)
+
+5. **Class Imbalance**:
+   - [ ] Use stratified sampling in all train/test splits
+   - [ ] Consider class weights in classifier training (especially LogReg and SVM)
+   - [ ] Report both macro and weighted F1 to account for imbalance
+
+6. **Source Bias Mitigation**:
+   - [ ] Train a source-prediction classifier on embeddings during EDA (if source accuracy >80%, there is stylistic leakage)
+   - [ ] Augment benign samples from additional sources to dilute source signal
+   - [ ] Report per-source results alongside aggregate metrics
+
+## Next Steps
+
+### Immediate: Sprint 2A — Taxonomy Finalization + Split Generation
+
+This is the **critical blocker** for all downstream experiments. The core LOATO contribution cannot proceed until we have enough viable attack categories.
+
+**Step 1: Apply GenTel Filtering**
+```bash
+# Filter GenTel samples with injection confidence < 0.4
+# Reduces dataset from ~37,773 to ~32,683
+```
+- Apply the threshold=0.4 from the quality report
+- Rebuild the unified parquet with filtered data
+- Re-compute dataset statistics to confirm new class balance
+
+**Step 2: Tier 3 LLM Taxonomy Mapping**
+- Scope: 15,851 unmapped injection samples (46.7% of all injections)
+- Method: GPT-4o-mini with few-shot prompting, batch size 8
+- Cost: ~$2-5 for ~2,000 API calls
+- Validation: 200-sample manual review for accuracy
+- Goal: Populate `payload_splitting`, `indirect_injection`, and boost `social_engineering` above 200
+
+**Step 3: Merge Small Categories**
+- After Tier 3 results are in, merge any remaining categories below 50 samples
+- Target: 6-8 final categories, all with >=200 samples
+
+**Step 4: Generate Splits**
+- Implement `data/splits.py` (currently a stub)
+- Generate: LOATO folds, 5-fold CV, direct->indirect, cross-lingual
+- Save as JSON index files in `data/splits/`
+
+### Then: Sprint 2B — Classifiers + Training Pipeline
+
+Once splits exist, implement the 4 classifiers (LogReg, SVM, XGBoost, MLP) and training loop. All are simple sklearn wrappers (~50 lines each).
+
+### Then: Sprint 3 — Core Experiments (LOATO)
+
+Run Standard CV + LOATO experiments across all 5 embeddings x 4 classifiers. Compute generalization gap (F1_standard - F1_LOATO). This is the paper's primary contribution.
+
+### Then: Sprints 4-5 — Transfer Experiments, Analysis, Write-up
+
+Fill in paper Sections 4 (Results), 5 (Discussion), 6 (Conclusion) with experimental findings.
 
 ---
 
@@ -717,7 +799,7 @@ with open("results/eda/stats.json", "w") as f:
 
 ### Expected Runtime
 
-- **Dataset size**: ~20,000 samples
+- **Dataset size**: ~37,773 samples (pre-GenTel filtering)
 - **Runtime**: ~30-60 seconds
   - Data loading: 5s
   - Statistics: 5s
@@ -892,6 +974,6 @@ For questions about this EDA:
 
 ---
 
-**Last Updated**: February 8, 2026
-**Document Version**: 1.0
-**Status**: ✅ Complete
+**Last Updated**: February 14, 2026
+**Document Version**: 2.0 (findings backfilled from EDA pipeline results)
+**Status**: Findings complete, recommendations actionable for Sprint 2A
