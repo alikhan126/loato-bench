@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import hashlib
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np

@@ -13,16 +13,16 @@ Pipeline steps:
 
 from __future__ import annotations
 
+from dataclasses import asdict
 import hashlib
 import logging
 import re
 import unicodedata
-from dataclasses import asdict
 
-import pandas as pd
 from datasketch import MinHash, MinHashLSH
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
+import pandas as pd
 
 from loato_bench.data.base import UnifiedSample
 
@@ -297,3 +297,73 @@ def harmonize_samples(
         df["source"].nunique(),
     )
     return df
+
+
+# ---------------------------------------------------------------------------
+# GenTel filtering
+# ---------------------------------------------------------------------------
+
+
+def filter_gentel_samples(
+    df: pd.DataFrame,
+    threshold: float = 0.4,
+    max_samples: int = 5000,
+    keywords: list[str] | None = None,
+) -> pd.DataFrame:
+    """Filter GenTel samples by injection confidence score.
+
+    Uses ``compute_injection_confidence_scores()`` from ``analysis.quality``
+    to score GenTel samples.  Keeps those scoring >= *threshold*, caps at
+    *max_samples* (top-scored).  Non-GenTel samples pass through unchanged.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Unified dataset with ``source`` and ``text`` columns.
+    threshold : float
+        Minimum injection confidence score to keep a GenTel sample.
+    max_samples : int
+        Maximum number of GenTel samples to retain after filtering.
+    keywords : list[str] | None
+        Optional custom keyword list forwarded to the scorer.
+
+    Returns
+    -------
+    pd.DataFrame
+        Filtered dataset (new DataFrame; original is not modified).
+    """
+    from loato_bench.analysis.quality import compute_injection_confidence_scores
+
+    df = df.copy()
+
+    gentel_mask = df["source"].str.lower().str.contains("gentel", na=False)
+    if not gentel_mask.any():
+        return df
+
+    gentel_df = df[gentel_mask]
+    non_gentel_df = df[~gentel_mask]
+
+    # Score GenTel samples
+    scores = compute_injection_confidence_scores(gentel_df, keywords=keywords)
+
+    # Keep only those above threshold
+    above_threshold = scores >= threshold
+    filtered_gentel = gentel_df[above_threshold].copy()
+    filtered_scores = scores[above_threshold]
+
+    # Cap at max_samples (keep top-scored)
+    if len(filtered_gentel) > max_samples:
+        top_indices = filtered_scores.nlargest(max_samples).index
+        filtered_gentel = filtered_gentel.loc[top_indices]
+
+    removed = len(gentel_df) - len(filtered_gentel)
+    if removed > 0:
+        logger.info(
+            "GenTel filtering removed %d samples (%d → %d)",
+            removed,
+            len(gentel_df),
+            len(filtered_gentel),
+        )
+
+    result = pd.concat([non_gentel_df, filtered_gentel], ignore_index=True)
+    return result

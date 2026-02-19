@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import numpy as np
-import openai
 from numpy.typing import NDArray
+import openai
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from loato_bench.embeddings.base import EmbeddingModel
