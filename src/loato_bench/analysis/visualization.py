@@ -5,17 +5,17 @@ All plotting functions use managed_figure context manager for memory safety.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Generator
 from contextlib import contextmanager
+import logging
 from pathlib import Path
 
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 
 logger = logging.getLogger(__name__)
 

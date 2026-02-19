@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from numpy.typing import NDArray
 
 import wandb
 
@@ -45,8 +44,8 @@ def log_metrics(
 
 def log_confusion_matrix(
     run: wandb.sdk.wandb_run.Run,
-    y_true: NDArray[np.int64],
-    y_pred: NDArray[np.int64],
+    y_true: np.typing.NDArray[np.int64],
+    y_pred: np.typing.NDArray[np.int64],
     class_names: list[str],
 ) -> None:
     """Log a confusion matrix plot to W&B."""

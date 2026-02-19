@@ -79,6 +79,9 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

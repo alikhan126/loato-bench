@@ -13,16 +13,16 @@ Pipeline steps:
 
 from __future__ import annotations
 
+from dataclasses import asdict
 import hashlib
 import logging
 import re
 import unicodedata
-from dataclasses import asdict
 
-import pandas as pd
 from datasketch import MinHash, MinHashLSH
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
+import pandas as pd
 
 from loato_bench.data.base import UnifiedSample
 

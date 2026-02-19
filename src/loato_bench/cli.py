@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 
-import typer
 from rich.console import Console
+import typer
 
 from loato_bench.utils.config import DATA_DIR
 

@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import re
+
 from typer.testing import CliRunner
 
 from loato_bench.cli import app
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 class TestDataSplitCLI:
@@ -19,19 +26,23 @@ class TestDataSplitCLI:
 
     def test_shows_gentel_filtering_option(self) -> None:
         result = runner.invoke(app, ["data", "split", "--help"])
-        assert "--apply-filter" in result.output or "--no-apply-filter" in result.output
+        clean = _strip_ansi(result.output)
+        assert "--apply-filter" in clean or "--no-apply-filter" in clean
 
     def test_shows_merge_option(self) -> None:
         result = runner.invoke(app, ["data", "split", "--help"])
-        assert "--apply-merges" in result.output or "--no-apply-merges" in result.output
+        clean = _strip_ansi(result.output)
+        assert "--apply-merges" in clean or "--no-apply-merges" in clean
 
     def test_shows_tier3_option(self) -> None:
         result = runner.invoke(app, ["data", "split", "--help"])
-        assert "--apply-tier3" in result.output or "--no-apply-tier3" in result.output
+        clean = _strip_ansi(result.output)
+        assert "--apply-tier3" in clean or "--no-apply-tier3" in clean
 
     def test_shows_output_dir_option(self) -> None:
         result = runner.invoke(app, ["data", "split", "--help"])
-        assert "--output-dir" in result.output
+        clean = _strip_ansi(result.output)
+        assert "--output-dir" in clean
 
     def test_fails_without_data(self) -> None:
         """Without unified_dataset.parquet, should exit with error."""
