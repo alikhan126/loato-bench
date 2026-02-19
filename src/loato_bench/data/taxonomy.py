@@ -460,6 +460,7 @@ def apply_tier3_llm_mapping(
 
     system_msg = _build_tier3_system(categories)
     calls_made = 0
+    mapped_count = 0
 
     for idx in unmapped_indices:
         text = df.at[idx, "text"]
@@ -473,6 +474,7 @@ def apply_tier3_llm_mapping(
             category = parse_tier3_response(cache[th], valid_categories)
             if category is not None:
                 df.at[idx, "attack_category"] = category
+                mapped_count += 1
             continue
 
         # Respect max_calls
@@ -488,13 +490,14 @@ def apply_tier3_llm_mapping(
         if category is not None:
             df.at[idx, "attack_category"] = category
             cache[th] = category
+            mapped_count += 1
         else:
             logger.debug("Tier 3 could not parse response %r for idx %d", response, idx)
 
     # Persist cache
     save_tier3_cache(cache, cache_path)
 
-    logger.info("Tier 3 LLM mapped %d samples (%d API calls)", calls_made, calls_made)
+    logger.info("Tier 3 LLM mapped %d samples (%d API calls)", mapped_count, calls_made)
     return df
 
 
