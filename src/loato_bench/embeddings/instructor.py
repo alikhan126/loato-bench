@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import os
 
-import numpy as np
 from InstructorEmbedding import INSTRUCTOR
+import numpy as np
 from numpy.typing import NDArray
 
 from loato_bench.embeddings.base import EmbeddingModel

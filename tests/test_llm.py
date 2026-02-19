@@ -117,8 +117,11 @@ class TestGetLLMProvider:
         with pytest.raises(ValueError, match="Unknown LLM provider"):
             get_llm_provider(config)
 
+    @patch("loato_bench.llm.openai_llm.openai.OpenAI")
     @patch("loato_bench.llm.anthropic_llm.anthropic.Anthropic")
-    def test_factory_loads_default_config(self, mock_anthropic_cls: MagicMock):
+    def test_factory_loads_default_config(
+        self, mock_anthropic_cls: MagicMock, mock_openai_cls: MagicMock
+    ):
         """When no config is passed, should load from configs/llm.yaml."""
         from loato_bench.llm import get_llm_provider
 
