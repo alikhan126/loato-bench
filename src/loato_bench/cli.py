@@ -119,11 +119,61 @@ def harmonize() -> None:
 
 
 @data_app.command()
-def split() -> None:
+def split(
+    apply_filter: bool = typer.Option(True, help="Apply GenTel filtering."),
+    apply_merges: bool = typer.Option(True, help="Merge small taxonomy categories."),
+    apply_tier3: bool = typer.Option(False, help="Run Tier 3 LLM taxonomy mapping."),
+    output_dir: str | None = typer.Option(None, help="Output directory for splits."),
+) -> None:
     """Generate all evaluation splits (standard CV, LOATO, transfer)."""
+    from pathlib import Path
+
+    import pandas as pd
+
+    from loato_bench.data.harmonize import filter_gentel_samples
+    from loato_bench.data.splits import generate_all_splits
+    from loato_bench.data.taxonomy import (
+        apply_taxonomy_mapping,
+        merge_small_categories,
+    )
+
     console.print("[bold green]Generating splits...[/bold green]")
-    # TODO: Sprint 2A — invoke split generation
-    console.print("[yellow]Not yet implemented.[/yellow]")
+
+    # 1. Load unified dataset
+    parquet_path = DATA_DIR / "processed" / "unified_dataset.parquet"
+    if not parquet_path.exists():
+        console.print("[red]No processed data. Run 'loato-bench data harmonize' first.[/red]")
+        raise typer.Exit(1)
+
+    df = pd.read_parquet(parquet_path)
+    console.print(f"  Loaded {len(df):,} samples")
+
+    # 2. Optionally filter GenTel
+    if apply_filter:
+        before = len(df)
+        df = filter_gentel_samples(df)
+        console.print(f"  GenTel filtering: {before:,} → {len(df):,}")
+
+    # 3. Apply taxonomy mapping (Tier 1+2, optionally Tier 3)
+    df = apply_taxonomy_mapping(df, apply_tier3=apply_tier3)
+    mapped = df["attack_category"].notna().sum()
+    total_inj = (df["label"] == 1).sum()
+    console.print(f"  Taxonomy: {mapped}/{total_inj} injection samples mapped")
+
+    # 4. Optionally merge small categories
+    if apply_merges:
+        df = merge_small_categories(df)
+        cats = df[df["label"] == 1]["attack_category"].value_counts()
+        console.print(f"  Categories after merge: {cats.to_dict()}")
+
+    # 5. Generate all splits
+    out = Path(output_dir) if output_dir else None
+    saved = generate_all_splits(df, output_dir=out)
+
+    # 6. Summary
+    console.print(f"\n[bold green]Generated {len(saved)} split files:[/bold green]")
+    for name, path in saved.items():
+        console.print(f"  {name}: {path}")
 
 
 # ---------------------------------------------------------------------------

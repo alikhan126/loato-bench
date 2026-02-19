@@ -1,9 +1,15 @@
 """Tests for taxonomy mapping module."""
 
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
 from loato_bench.data import taxonomy
+from loato_bench.llm.base import LLMProvider
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -331,3 +337,342 @@ class TestApplyTaxonomyMapping:
 
         assert len(result) == len(sample_df)
         assert list(result.columns) == list(sample_df.columns)
+
+
+# ---------------------------------------------------------------------------
+# Mock LLM provider for Tier 3 tests
+# ---------------------------------------------------------------------------
+
+
+class MockLLMProvider(LLMProvider):
+    """Mock LLM that returns predefined responses keyed by prompt substring."""
+
+    def __init__(self, responses: dict[str, str] | None = None) -> None:
+        self._responses = responses or {}
+        self.calls: list[str] = []
+
+    @property
+    def name(self) -> str:
+        return "mock"
+
+    def complete(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        self.calls.append(prompt)
+        for key, resp in self._responses.items():
+            if key in prompt:
+                return resp
+        return "instruction_override"
+
+
+# ---------------------------------------------------------------------------
+# Test build_tier3_prompt
+# ---------------------------------------------------------------------------
+
+
+class TestBuildTier3Prompt:
+    """Tests for build_tier3_prompt."""
+
+    def test_includes_text(self) -> None:
+        prompt = taxonomy.build_tier3_prompt("sample text", {"cat1": {"description": "d"}})
+        assert "sample text" in prompt
+
+    def test_is_string(self) -> None:
+        prompt = taxonomy.build_tier3_prompt("x", {})
+        assert isinstance(prompt, str)
+
+    def test_nonempty(self) -> None:
+        prompt = taxonomy.build_tier3_prompt("hello", {"a": {"description": "desc"}})
+        assert len(prompt) > 0
+
+
+# ---------------------------------------------------------------------------
+# Test parse_tier3_response
+# ---------------------------------------------------------------------------
+
+
+class TestParseTier3Response:
+    """Tests for parse_tier3_response."""
+
+    def test_valid_category_returned(self) -> None:
+        result = taxonomy.parse_tier3_response("instruction_override", ["instruction_override"])
+        assert result == "instruction_override"
+
+    def test_invalid_response_returns_none(self) -> None:
+        result = taxonomy.parse_tier3_response("not_a_category", ["instruction_override"])
+        assert result is None
+
+    def test_case_insensitive(self) -> None:
+        result = taxonomy.parse_tier3_response("INSTRUCTION_OVERRIDE", ["instruction_override"])
+        assert result == "instruction_override"
+
+    def test_whitespace_handling(self) -> None:
+        result = taxonomy.parse_tier3_response(
+            "  instruction_override  \n", ["instruction_override"]
+        )
+        assert result == "instruction_override"
+
+
+# ---------------------------------------------------------------------------
+# Test Tier 3 cache
+# ---------------------------------------------------------------------------
+
+
+class TestTier3Cache:
+    """Tests for load/save tier3 cache."""
+
+    def test_round_trip(self, tmp_path: Path) -> None:
+        cache = {"abc123": "jailbreak_roleplay", "def456": "instruction_override"}
+        path = tmp_path / "cache.json"
+        taxonomy.save_tier3_cache(cache, path)
+        loaded = taxonomy.load_tier3_cache(path)
+        assert loaded == cache
+
+    def test_load_missing_file(self, tmp_path: Path) -> None:
+        path = tmp_path / "nonexistent.json"
+        result = taxonomy.load_tier3_cache(path)
+        assert result == {}
+
+    def test_load_corrupt_file(self, tmp_path: Path) -> None:
+        path = tmp_path / "bad.json"
+        path.write_text("{invalid json!!")
+        result = taxonomy.load_tier3_cache(path)
+        assert result == {}
+
+    def test_creates_parent_dir(self, tmp_path: Path) -> None:
+        path = tmp_path / "sub" / "dir" / "cache.json"
+        taxonomy.save_tier3_cache({"a": "b"}, path)
+        assert path.exists()
+
+
+# ---------------------------------------------------------------------------
+# Test apply_tier3_llm_mapping
+# ---------------------------------------------------------------------------
+
+
+class TestApplyTier3LlmMapping:
+    """Tests for apply_tier3_llm_mapping."""
+
+    @pytest.fixture
+    def categories_config(self) -> dict[str, dict[str, str]]:
+        return {
+            "categories": {
+                "instruction_override": {"description": "Direct override"},
+                "jailbreak_roleplay": {"description": "Jailbreak"},
+            }
+        }
+
+    def test_only_calls_llm_for_unmapped_injection(
+        self, tmp_path: Path, categories_config: dict[str, dict[str, str]]
+    ) -> None:
+        df = pd.DataFrame(
+            {
+                "text": ["unmapped attack", "benign text", "already mapped"],
+                "label": [1, 0, 1],
+                "attack_category": [None, None, "jailbreak_roleplay"],
+            }
+        )
+        mock = MockLLMProvider({"unmapped attack": "instruction_override"})
+        result = taxonomy.apply_tier3_llm_mapping(
+            df,
+            config=categories_config,
+            llm_provider=mock,
+            cache_path=tmp_path / "c.json",
+        )
+        # Should only call LLM for the unmapped injection sample
+        assert len(mock.calls) == 1
+        assert result.at[0, "attack_category"] == "instruction_override"
+
+    def test_skips_benign_samples(
+        self, tmp_path: Path, categories_config: dict[str, dict[str, str]]
+    ) -> None:
+        df = pd.DataFrame(
+            {
+                "text": ["benign text"],
+                "label": [0],
+                "attack_category": [None],
+            }
+        )
+        mock = MockLLMProvider()
+        result = taxonomy.apply_tier3_llm_mapping(
+            df,
+            config=categories_config,
+            llm_provider=mock,
+            cache_path=tmp_path / "c.json",
+        )
+        assert len(mock.calls) == 0
+        assert result.at[0, "attack_category"] is None
+
+    def test_respects_max_calls(
+        self, tmp_path: Path, categories_config: dict[str, dict[str, str]]
+    ) -> None:
+        df = pd.DataFrame(
+            {
+                "text": [f"attack text {i}" for i in range(10)],
+                "label": [1] * 10,
+                "attack_category": [None] * 10,
+            }
+        )
+        mock = MockLLMProvider()
+        taxonomy.apply_tier3_llm_mapping(
+            df,
+            config=categories_config,
+            llm_provider=mock,
+            max_calls=3,
+            cache_path=tmp_path / "c.json",
+        )
+        assert len(mock.calls) == 3
+
+    def test_uses_cache(self, tmp_path: Path, categories_config: dict[str, dict[str, str]]) -> None:
+        cache_path = tmp_path / "c.json"
+        # Pre-populate cache
+        text = "cached attack text"
+        th = taxonomy._text_hash(text)
+        cache_path.write_text(json.dumps({th: "jailbreak_roleplay"}))
+
+        df = pd.DataFrame(
+            {
+                "text": [text],
+                "label": [1],
+                "attack_category": [None],
+            }
+        )
+        mock = MockLLMProvider()
+        result = taxonomy.apply_tier3_llm_mapping(
+            df,
+            config=categories_config,
+            llm_provider=mock,
+            cache_path=cache_path,
+        )
+        # Should NOT call LLM — served from cache
+        assert len(mock.calls) == 0
+        assert result.at[0, "attack_category"] == "jailbreak_roleplay"
+
+    def test_saves_to_cache(
+        self, tmp_path: Path, categories_config: dict[str, dict[str, str]]
+    ) -> None:
+        cache_path = tmp_path / "c.json"
+        df = pd.DataFrame(
+            {
+                "text": ["new attack"],
+                "label": [1],
+                "attack_category": [None],
+            }
+        )
+        mock = MockLLMProvider({"new attack": "instruction_override"})
+        taxonomy.apply_tier3_llm_mapping(
+            df,
+            config=categories_config,
+            llm_provider=mock,
+            cache_path=cache_path,
+        )
+        saved = json.loads(cache_path.read_text())
+        assert len(saved) == 1
+
+    def test_does_not_modify_original(
+        self, tmp_path: Path, categories_config: dict[str, dict[str, str]]
+    ) -> None:
+        df = pd.DataFrame(
+            {
+                "text": ["attack text"],
+                "label": [1],
+                "attack_category": [None],
+            }
+        )
+        original = df.copy()
+        mock = MockLLMProvider()
+        taxonomy.apply_tier3_llm_mapping(
+            df,
+            config=categories_config,
+            llm_provider=mock,
+            cache_path=tmp_path / "c.json",
+        )
+        pd.testing.assert_frame_equal(df, original)
+
+    def test_empty_dataframe(
+        self, tmp_path: Path, categories_config: dict[str, dict[str, str]]
+    ) -> None:
+        df = pd.DataFrame(columns=["text", "label", "attack_category"])
+        mock = MockLLMProvider()
+        result = taxonomy.apply_tier3_llm_mapping(
+            df,
+            config=categories_config,
+            llm_provider=mock,
+            cache_path=tmp_path / "c.json",
+        )
+        assert len(result) == 0
+
+
+# ---------------------------------------------------------------------------
+# Test merge_small_categories
+# ---------------------------------------------------------------------------
+
+
+class TestMergeSmallCategories:
+    """Tests for merge_small_categories."""
+
+    def test_returns_dataframe(self) -> None:
+        df = pd.DataFrame({"attack_category": ["a", "b"]})
+        result = taxonomy.merge_small_categories(df, merge_map={"a": "b"})
+        assert isinstance(result, pd.DataFrame)
+
+    def test_merges_specified_categories(self) -> None:
+        df = pd.DataFrame(
+            {
+                "attack_category": [
+                    "obfuscation_encoding",
+                    "instruction_override",
+                    "jailbreak_roleplay",
+                ]
+            }
+        )
+        result = taxonomy.merge_small_categories(df)
+        assert (result["attack_category"] == "instruction_override").sum() == 2
+        assert (result["attack_category"] == "jailbreak_roleplay").sum() == 1
+
+    def test_preserves_non_merged(self) -> None:
+        df = pd.DataFrame({"attack_category": ["jailbreak_roleplay", "social_engineering"]})
+        result = taxonomy.merge_small_categories(df)
+        assert list(result["attack_category"]) == ["jailbreak_roleplay", "social_engineering"]
+
+    def test_handles_missing_categories_in_data(self) -> None:
+        df = pd.DataFrame({"attack_category": ["jailbreak_roleplay"]})
+        # merge_map references categories not in data — no error
+        result = taxonomy.merge_small_categories(
+            df, merge_map={"nonexistent": "jailbreak_roleplay"}
+        )
+        assert len(result) == 1
+
+    def test_does_not_modify_original(self) -> None:
+        df = pd.DataFrame({"attack_category": ["obfuscation_encoding"]})
+        original = df.copy()
+        taxonomy.merge_small_categories(df)
+        pd.testing.assert_frame_equal(df, original)
+
+    def test_empty_merge_map(self) -> None:
+        df = pd.DataFrame({"attack_category": ["a", "b"]})
+        result = taxonomy.merge_small_categories(df, merge_map={})
+        assert list(result["attack_category"]) == ["a", "b"]
+
+    def test_counts_after_merge(self) -> None:
+        df = pd.DataFrame(
+            {
+                "attack_category": (
+                    ["instruction_override"] * 10
+                    + ["obfuscation_encoding"] * 5
+                    + ["context_manipulation"] * 3
+                )
+            }
+        )
+        result = taxonomy.merge_small_categories(df)
+        assert (result["attack_category"] == "instruction_override").sum() == 18
+
+    def test_empty_dataframe(self) -> None:
+        df = pd.DataFrame(columns=["attack_category"])
+        result = taxonomy.merge_small_categories(df)
+        assert len(result) == 0

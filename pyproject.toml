@@ -137,5 +137,6 @@ module = [
     "llvmlite.*",
     "xgboost.*",
     "anthropic.*",
+    "sklearn.*",
 ]
 ignore_missing_imports = true

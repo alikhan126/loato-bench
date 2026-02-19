@@ -6,8 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import wandb
 from numpy.typing import NDArray
+
+import wandb
 
 
 def init_run(
