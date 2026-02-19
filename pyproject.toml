@@ -81,6 +81,7 @@ select = ["E", "F", "I", "UP"]
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
+known-third-party = ["numpy", "pandas", "sklearn", "matplotlib", "seaborn", "wandb", "tqdm", "yaml", "openai", "xgboost", "sentence_transformers", "InstructorEmbedding", "tenacity", "llama_cpp"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
