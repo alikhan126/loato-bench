@@ -10,7 +10,7 @@
 **LOATO-Bench**
 *Can Prompt Injection Classifiers Detect Attacks They've Never Seen Before?*
 
-Ali Khan — MS Data Science Capstone, Pace University
+Ali Khan, Ahmad Mukhtar — MS Data Science Capstone, Pace University
 
 **Speaker notes:**
 Hi everyone, my capstone project is called LOATO-Bench. The core question I'm trying to answer is simple: if we train a classifier to detect certain types of prompt injection attacks, will it also catch completely new types of attacks it's never been trained on? That's what this project is all about.
@@ -24,9 +24,10 @@ Hi everyone, my capstone project is called LOATO-Bench. The core question I'm tr
 - But new tricks keep appearing — it's an arms race
 - Smaller and open-source AI models have almost no protection at all
 - The biggest risk today: attackers hide malicious instructions inside normal-looking documents that get fed to AI systems (through RAG pipelines)
+- **We tested this**: Both Claude Sonnet and GPT-4o-mini were compromised on 3/5 RAG-style indirect injection tests (see `docs/llm_vulnerability_demo.md`)
 
 **Speaker notes:**
-So what's the problem? You've probably heard of prompt injection — it's when someone crafts a sneaky input to make an AI do something it shouldn't. Now, the big commercial models like GPT-4 and Claude have gotten pretty good at blocking the known tricks. But here's the thing — new attacks keep popping up all the time. And if you're using a smaller model, or a fine-tuned open-source model, they often have zero protection. The scariest part is what's called indirect injection — imagine a company uses AI to summarize documents. An attacker hides instructions inside a normal-looking PDF, and when the AI reads it, it follows those hidden instructions instead of doing its job. That's a real threat right now.
+So what's the problem? You've probably heard of prompt injection — it's when someone crafts a sneaky input to make an AI do something it shouldn't. Now, the big commercial models like GPT-4 and Claude have gotten pretty good at blocking the known tricks. But here's the thing — new attacks keep popping up all the time. And if you're using a smaller model, or a fine-tuned open-source model, they often have zero protection. The scariest part is what's called indirect injection — imagine a company uses AI to summarize documents. An attacker hides instructions inside a normal-looking PDF, and when the AI reads it, it follows those hidden instructions instead of doing its job. And this isn't hypothetical — we actually tested it. We sent 5 different injection attacks hidden inside normal-looking documents to both Claude and GPT-4o, and both models were compromised on 3 out of 5 tests. They even failed on different attacks, which means no single vendor has solved this. That's a real, demonstrable threat right now.
 
 ---
 
@@ -36,9 +37,10 @@ So what's the problem? You've probably heard of prompt injection — it's when s
 - A lightweight classifier can screen inputs in ~1 millisecond — way cheaper and faster than running another AI call
 - Works with ANY AI model underneath (model-agnostic)
 - Adds a separate layer of defense — even if the AI's own safety fails, this catches it first
+- **Our demo proves it**: Classifier blocked 5/5 poisoned documents that fooled both frontier LLMs
 
 **Speaker notes:**
-You might ask — if the big models are getting better at blocking attacks, why do we even need a separate classifier? Think of it like home security. You wouldn't just rely on one lock. You'd want a deadbolt, maybe a camera, an alarm. Same idea here. An embedding-based classifier is like a fast security scanner at the door. It checks every input in about a millisecond — that's basically instant — and it works regardless of which AI model you're using behind it. So even if the AI's own defenses fail against some new trick, this classifier is there as a backup. And it's dirt cheap to run compared to making another AI call for safety checking.
+You might ask — if the big models are getting better at blocking attacks, why do we even need a separate classifier? Think of it like home security. You wouldn't just rely on one lock. You'd want a deadbolt, maybe a camera, an alarm. Same idea here. An embedding-based classifier is like a fast security scanner at the door. It checks every input in about a millisecond — that's basically instant — and it works regardless of which AI model you're using behind it. So even if the AI's own defenses fail against some new trick, this classifier is there as a backup. And it's dirt cheap to run compared to making another AI call for safety checking. In our demo, the classifier blocked all 5 poisoned documents — including the 3 that each LLM actually fell for. That's the value of defense in depth.
 
 ---
 
@@ -113,3 +115,13 @@ Infrastructure done. Taxonomy finalization and classifier implementation next, t
 
 **Q: What if the classifier doesn't generalize?**
 That's actually a useful finding too — it would mean current embedding-based approaches are brittle against novel attacks, which is important for the community to know. But I expect some models to generalize better than others, and identifying which ones is the contribution.
+
+**Q: Have you actually tested whether LLMs are vulnerable?**
+Yes. We ran a live demo (Scenario 0 in the demo notebook, documented in `docs/llm_vulnerability_demo.md`). We tested both Claude Sonnet and GPT-4o-mini against 5 direct attacks and 5 RAG-style indirect injection attacks. Key findings:
+- Direct attacks: both models mostly resist (GPT refused 4/5, Claude deflected 3/5)
+- RAG indirect attacks: both models compromised on 3/5 tests (60% success rate for the attacker)
+- They fail on *different* attacks — Claude leaked its system prompt, GPT followed an instruction hijack — proving no single vendor has solved this
+- Our embedding classifier blocked all 5 poisoned documents, catching every attack both LLMs missed
+
+**Q: What kinds of indirect injection attacks did you test?**
+Five types: canary word insertion (hidden "include this word" instruction), response override (replace the answer entirely), instruction hijack (leak system prompt), format manipulation (force French output), and data exfiltration (repeat system message). The subtler attacks succeeded more often — both LLMs fell for canary insertion and format manipulation, while the crude "respond with this exact sentence" override was resisted by both.
