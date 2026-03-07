@@ -124,6 +124,7 @@ def label(
     max_calls: int | None = typer.Option(None, help="Max API calls (None = all)."),
     dry_run: bool = typer.Option(False, help="Preview only, no API calls."),
     output_dir: str | None = typer.Option(None, help="Output dir for labeling artifacts."),
+    concurrency: int = typer.Option(8, help="Max concurrent API requests."),
 ) -> None:
     """Label unlabeled injection samples using GPT-4o-mini."""
     import json
@@ -172,6 +173,7 @@ def label(
         max_calls=max_calls,
         output_dir=out_path,
         dry_run=dry_run,
+        concurrency=concurrency,
     )
 
     # 6. Validate distribution

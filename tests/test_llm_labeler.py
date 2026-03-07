@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
 
@@ -272,19 +272,28 @@ def _mock_openai_response(category: str = "C2", confidence: float = 0.85) -> Mag
     return response
 
 
+def _mock_async_client(category: str = "C2", confidence: float = 0.85) -> MagicMock:
+    """Create a mock AsyncOpenAI client with an async create method."""
+    mock_client = MagicMock()
+    mock_client.chat.completions.create = AsyncMock(
+        return_value=_mock_openai_response(category, confidence)
+    )
+    mock_client.close = AsyncMock()
+    return mock_client
+
+
 class TestLabelSamples:
     """Tests for label_samples."""
 
-    @patch("loato_bench.data.llm_labeler.openai.OpenAI")
+    @patch("loato_bench.data.llm_labeler.openai.AsyncOpenAI")
     @patch("loato_bench.data.llm_labeler.load_llm_config")
     def test_only_unlabeled_injections_sent(
-        self, mock_config: MagicMock, mock_openai_cls: MagicMock, tmp_path: Path
+        self, mock_config: MagicMock, mock_async_cls: MagicMock, tmp_path: Path
     ) -> None:
         """Only injection samples with null attack_category get API calls."""
         mock_config.return_value = MagicMock(model="gpt-4o-mini", temperature=0.0)
-        mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
-        mock_client.chat.completions.create.return_value = _mock_openai_response()
+        mock_client = _mock_async_client()
+        mock_async_cls.return_value = mock_client
 
         df = _make_df(n_labeled=2, n_unlabeled=3, n_benign=2)
         result = label_samples(df, output_dir=tmp_path)
@@ -295,18 +304,17 @@ class TestLabelSamples:
         benign = result[result["label"] == 0]
         assert (benign["label_source"] != "gpt4o_mini").all()
 
-    @patch("loato_bench.data.llm_labeler.openai.OpenAI")
+    @patch("loato_bench.data.llm_labeler.openai.AsyncOpenAI")
     @patch("loato_bench.data.llm_labeler.load_llm_config")
     def test_checkpoint_resume_skips_done(
-        self, mock_config: MagicMock, mock_openai_cls: MagicMock, tmp_path: Path
+        self, mock_config: MagicMock, mock_async_cls: MagicMock, tmp_path: Path
     ) -> None:
         """Samples already in checkpoint log are skipped."""
         from loato_bench.data.taxonomy import _text_hash
 
         mock_config.return_value = MagicMock(model="gpt-4o-mini", temperature=0.0)
-        mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
-        mock_client.chat.completions.create.return_value = _mock_openai_response()
+        mock_client = _mock_async_client()
+        mock_async_cls.return_value = mock_client
 
         df = _make_df(n_labeled=0, n_unlabeled=3, n_benign=0)
 
@@ -320,18 +328,15 @@ class TestLabelSamples:
         # Should skip the first sample, process 2
         assert mock_client.chat.completions.create.call_count == 2
 
-    @patch("loato_bench.data.llm_labeler.openai.OpenAI")
+    @patch("loato_bench.data.llm_labeler.openai.AsyncOpenAI")
     @patch("loato_bench.data.llm_labeler.load_llm_config")
     def test_confidence_threshold_filtering(
-        self, mock_config: MagicMock, mock_openai_cls: MagicMock, tmp_path: Path
+        self, mock_config: MagicMock, mock_async_cls: MagicMock, tmp_path: Path
     ) -> None:
         """Labels below threshold get 'uncertain' label_source."""
         mock_config.return_value = MagicMock(model="gpt-4o-mini", temperature=0.0)
-        mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
-
-        # Return low-confidence response
-        mock_client.chat.completions.create.return_value = _mock_openai_response(confidence=0.3)
+        mock_client = _mock_async_client(confidence=0.3)
+        mock_async_cls.return_value = mock_client
 
         df = _make_df(n_labeled=0, n_unlabeled=2, n_benign=0)
         result = label_samples(df, confidence_threshold=0.6, output_dir=tmp_path)
@@ -342,16 +347,15 @@ class TestLabelSamples:
         # attack_category should remain None
         assert unlabeled["attack_category"].isna().all()
 
-    @patch("loato_bench.data.llm_labeler.openai.OpenAI")
+    @patch("loato_bench.data.llm_labeler.openai.AsyncOpenAI")
     @patch("loato_bench.data.llm_labeler.load_llm_config")
     def test_max_calls_respected(
-        self, mock_config: MagicMock, mock_openai_cls: MagicMock, tmp_path: Path
+        self, mock_config: MagicMock, mock_async_cls: MagicMock, tmp_path: Path
     ) -> None:
         """Stops after max_calls API calls."""
         mock_config.return_value = MagicMock(model="gpt-4o-mini", temperature=0.0)
-        mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
-        mock_client.chat.completions.create.return_value = _mock_openai_response()
+        mock_client = _mock_async_client()
+        mock_async_cls.return_value = mock_client
 
         df = _make_df(n_labeled=0, n_unlabeled=10, n_benign=0)
         label_samples(df, max_calls=3, output_dir=tmp_path)
@@ -362,7 +366,7 @@ class TestLabelSamples:
         """Dry run makes no API calls."""
         df = _make_df(n_labeled=0, n_unlabeled=5, n_benign=0)
 
-        with patch("loato_bench.data.llm_labeler.openai.OpenAI") as mock_cls:
+        with patch("loato_bench.data.llm_labeler.openai.AsyncOpenAI") as mock_cls:
             result = label_samples(df, dry_run=True, output_dir=tmp_path)
             mock_cls.assert_not_called()
 
@@ -370,16 +374,15 @@ class TestLabelSamples:
         assert "label_source" in result.columns
         assert (result["label_source"] != "gpt4o_mini").all()
 
-    @patch("loato_bench.data.llm_labeler.openai.OpenAI")
+    @patch("loato_bench.data.llm_labeler.openai.AsyncOpenAI")
     @patch("loato_bench.data.llm_labeler.load_llm_config")
     def test_jsonl_written_before_labels(
-        self, mock_config: MagicMock, mock_openai_cls: MagicMock, tmp_path: Path
+        self, mock_config: MagicMock, mock_async_cls: MagicMock, tmp_path: Path
     ) -> None:
         """JSONL log is written for every API call."""
         mock_config.return_value = MagicMock(model="gpt-4o-mini", temperature=0.0)
-        mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
-        mock_client.chat.completions.create.return_value = _mock_openai_response()
+        mock_client = _mock_async_client()
+        mock_async_cls.return_value = mock_client
 
         df = _make_df(n_labeled=0, n_unlabeled=3, n_benign=0)
         label_samples(df, output_dir=tmp_path)
@@ -397,30 +400,27 @@ class TestLabelSamples:
             assert "timestamp" in record
             assert "model" in record
 
-    @patch("loato_bench.data.llm_labeler.openai.OpenAI")
+    @patch("loato_bench.data.llm_labeler.openai.AsyncOpenAI")
     @patch("loato_bench.data.llm_labeler.load_llm_config")
     def test_no_unlabeled_samples(
-        self, mock_config: MagicMock, mock_openai_cls: MagicMock, tmp_path: Path
+        self, mock_config: MagicMock, mock_async_cls: MagicMock, tmp_path: Path
     ) -> None:
         """No API calls when all injections are already labeled."""
         df = _make_df(n_labeled=5, n_unlabeled=0, n_benign=2)
         result = label_samples(df, output_dir=tmp_path)
 
-        mock_openai_cls.assert_not_called()
+        mock_async_cls.assert_not_called()
         assert len(result) == 7
 
-    @patch("loato_bench.data.llm_labeler.openai.OpenAI")
+    @patch("loato_bench.data.llm_labeler.openai.AsyncOpenAI")
     @patch("loato_bench.data.llm_labeler.load_llm_config")
     def test_labels_applied_above_threshold(
-        self, mock_config: MagicMock, mock_openai_cls: MagicMock, tmp_path: Path
+        self, mock_config: MagicMock, mock_async_cls: MagicMock, tmp_path: Path
     ) -> None:
         """High-confidence labels are applied to attack_category."""
         mock_config.return_value = MagicMock(model="gpt-4o-mini", temperature=0.0)
-        mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
-        mock_client.chat.completions.create.return_value = _mock_openai_response(
-            category="C3", confidence=0.95
-        )
+        mock_client = _mock_async_client(category="C3", confidence=0.95)
+        mock_async_cls.return_value = mock_client
 
         df = _make_df(n_labeled=0, n_unlabeled=2, n_benign=0)
         result = label_samples(df, confidence_threshold=0.6, output_dir=tmp_path)
