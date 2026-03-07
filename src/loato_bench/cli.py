@@ -218,6 +218,118 @@ def label(
         console.print(f"  LLM labels: {report['category_counts']}")
 
 
+@data_app.command("label-batch")
+def label_batch(
+    model: str = typer.Option("gpt-4o", help="Model for batch labeling."),
+    confidence_threshold: float = typer.Option(0.6, help="Min confidence to apply label."),
+    output_dir: str | None = typer.Option(None, help="Output dir for labeling artifacts."),
+    poll_interval: int = typer.Option(30, help="Seconds between batch status polls."),
+) -> None:
+    """Label unlabeled samples via OpenAI Batch API (cheaper, no rate limits)."""
+    import json
+    from pathlib import Path
+
+    import pandas as pd
+
+    from loato_bench.data.harmonize import filter_gentel_samples
+    from loato_bench.data.llm_labeler import (
+        create_batch_request_file,
+        download_and_apply_batch_results,
+        poll_batch,
+        submit_batch,
+        validate_distribution,
+    )
+    from loato_bench.data.taxonomy import apply_taxonomy_mapping
+    from loato_bench.data.taxonomy_spec import OLD_SLUG_TO_NEW
+
+    console.print(f"[bold green]Batch labeling with {model}...[/bold green]")
+
+    # 1. Load + filter + map (same as `label`)
+    parquet_path = DATA_DIR / "processed" / "unified_dataset.parquet"
+    if not parquet_path.exists():
+        console.print("[red]No processed data. Run 'loato-bench data harmonize' first.[/red]")
+        raise typer.Exit(1)
+
+    df = pd.read_parquet(parquet_path)
+    console.print(f"  Loaded {len(df):,} samples")
+
+    df = filter_gentel_samples(df)
+    df = apply_taxonomy_mapping(df, apply_tier3=False)
+
+    mask = df["attack_category"].notna()
+    df.loc[mask, "attack_category"] = df.loc[mask, "attack_category"].map(
+        lambda x: OLD_SLUG_TO_NEW.get(x, x)
+    )
+
+    # Ensure columns
+    if "label_source" not in df.columns:
+        df["label_source"] = pd.Series(dtype="object")
+    if "confidence" not in df.columns:
+        df["confidence"] = pd.Series(dtype="float64")
+    has_cat = df["attack_category"].notna() & (df["label"] == 1)
+    df.loc[has_cat & df["label_source"].isna(), "label_source"] = "tier1_2"
+
+    out_path = Path(output_dir) if output_dir else DATA_DIR / "labeling"
+
+    # 2. Create batch request file
+    request_path, id_to_idx = create_batch_request_file(df, out_path, model=model)
+    console.print(f"  Created {len(id_to_idx):,} batch requests")
+
+    if not id_to_idx:
+        console.print("[green]All samples already labeled![/green]")
+        return
+
+    # 3. Submit batch
+    batch_id = submit_batch(request_path)
+    console.print(f"  Batch submitted: {batch_id}")
+    console.print(f"  Polling every {poll_interval}s...")
+
+    # 4. Poll until done
+    output_file_id = poll_batch(batch_id, poll_interval=poll_interval)
+    console.print(f"  Batch complete! Output file: {output_file_id}")
+
+    # 5. Download and apply
+    df = download_and_apply_batch_results(
+        output_file_id,
+        df,
+        out_path,
+        confidence_threshold=confidence_threshold,
+        model=model,
+    )
+
+    # 6. Validate + save (same as `label`)
+    report = validate_distribution(df)
+    if report["warnings"]:
+        for w in report["warnings"]:
+            console.print(f"  [yellow]Warning: {w}[/yellow]")
+
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    df.to_parquet(labeled_path, index=False)
+    console.print(f"  Saved to {labeled_path}")
+
+    total_inj = (df["label"] == 1).sum()
+    labeled = df.loc[df["label"] == 1, "attack_category"].notna().sum()
+    coverage_pct = labeled / total_inj * 100 if total_inj > 0 else 0.0
+
+    coverage_report = {
+        "total_injection": int(total_inj),
+        "labeled": int(labeled),
+        "coverage_pct": round(float(coverage_pct), 2),
+        "category_counts": report.get("category_counts", {}),
+        "model": model,
+        "batch_id": batch_id,
+    }
+    coverage_path = out_path / "coverage_report.json"
+    with open(coverage_path, "w") as f:
+        json.dump(coverage_report, f, indent=2)
+
+    console.print(
+        f"\n[bold green]Done! Coverage: {labeled}/{total_inj} ({coverage_pct:.1f}%)[/bold green]"
+    )
+    if report["category_counts"]:
+        console.print(f"  LLM labels: {report['category_counts']}")
+
+
 @data_app.command()
 def split(
     apply_filter: bool = typer.Option(True, help="Apply GenTel filtering."),

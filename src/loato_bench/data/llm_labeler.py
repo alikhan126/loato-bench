@@ -1,10 +1,12 @@
-"""GPT-4o-mini batch categorization of unlabeled injection samples.
+"""GPT-4o-mini / GPT-4o batch categorization of unlabeled injection samples.
 
 Uses the OpenAI structured JSON output to classify injection samples into
 taxonomy v1.0 categories (C1--C7).  Results are logged to JSONL for
 checkpoint/resume and auditing.
 
-Supports async concurrent requests (default 50 in-flight) for ~40x speedup.
+Supports:
+- Async concurrent requests for real-time labeling
+- OpenAI Batch API for large runs (50% cheaper, no rate-limit issues)
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import datetime
 import json
 import logging
 from pathlib import Path
+import time
 from typing import Any
 
 import openai
@@ -456,6 +459,263 @@ def label_samples(
 
 
 # ---------------------------------------------------------------------------
+# OpenAI Batch API
+# ---------------------------------------------------------------------------
+
+BATCH_MODEL = "gpt-4o"
+
+
+def create_batch_request_file(
+    df: pd.DataFrame,
+    output_dir: Path,
+    *,
+    model: str = BATCH_MODEL,
+) -> tuple[Path, dict[str, int]]:
+    """Create a JSONL request file for the OpenAI Batch API.
+
+    Skips samples already in the checkpoint log.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataset with unlabeled injection samples.
+    output_dir : Path
+        Directory for batch artifacts.
+    model : str
+        Model to use (default ``gpt-4o``).
+
+    Returns
+    -------
+    tuple[Path, dict[str, int]]
+        Path to the request JSONL file and mapping of custom_id -> df index.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    log_path = output_dir / "llm_labels_raw.jsonl"
+    done_hashes = load_checkpoint(log_path)
+
+    system_prompt = build_labeling_system_prompt()
+    request_path = output_dir / "batch_requests.jsonl"
+    id_to_idx: dict[str, int] = {}
+
+    unlabeled_mask = (df["label"] == 1) & df["attack_category"].isna()
+
+    with open(request_path, "w") as f:
+        for idx in df.index[unlabeled_mask]:
+            text = str(df.at[idx, "text"])
+            sample_hash = _text_hash(text)
+            if sample_hash in done_hashes:
+                continue
+
+            custom_id = sample_hash
+            id_to_idx[custom_id] = idx
+            request = {
+                "custom_id": custom_id,
+                "method": "POST",
+                "url": "/v1/chat/completions",
+                "body": {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": text},
+                    ],
+                    "temperature": 0.0,
+                    "max_tokens": 64,
+                    "response_format": {"type": "json_object"},
+                },
+            }
+            f.write(json.dumps(request) + "\n")
+
+    # Save id-to-idx mapping
+    mapping_path = output_dir / "batch_id_mapping.json"
+    with open(mapping_path, "w") as f:
+        json.dump(id_to_idx, f)
+
+    logger.info("Created batch request file: %s (%d requests)", request_path, len(id_to_idx))
+    return request_path, id_to_idx
+
+
+def submit_batch(
+    request_path: Path,
+) -> str:
+    """Upload request file and submit an OpenAI batch job.
+
+    Parameters
+    ----------
+    request_path : Path
+        Path to the JSONL request file.
+
+    Returns
+    -------
+    str
+        Batch job ID.
+    """
+    client = openai.OpenAI()
+
+    with open(request_path, "rb") as f:
+        uploaded = client.files.create(file=f, purpose="batch")
+    logger.info("Uploaded file: %s", uploaded.id)
+
+    batch = client.batches.create(
+        input_file_id=uploaded.id,
+        endpoint="/v1/chat/completions",
+        completion_window="24h",
+    )
+    logger.info("Submitted batch: %s (status: %s)", batch.id, batch.status)
+    return batch.id
+
+
+def poll_batch(
+    batch_id: str,
+    *,
+    poll_interval: int = 30,
+) -> str:
+    """Poll a batch job until completion.
+
+    Parameters
+    ----------
+    batch_id : str
+        Batch job ID.
+    poll_interval : int
+        Seconds between polls.
+
+    Returns
+    -------
+    str
+        Output file ID.
+    """
+    client = openai.OpenAI()
+
+    while True:
+        batch = client.batches.retrieve(batch_id)
+        status = batch.status
+        completed = batch.request_counts.completed if batch.request_counts else 0
+        total = batch.request_counts.total if batch.request_counts else 0
+        failed = batch.request_counts.failed if batch.request_counts else 0
+
+        logger.info(
+            "Batch %s: status=%s, completed=%d/%d, failed=%d",
+            batch_id,
+            status,
+            completed,
+            total,
+            failed,
+        )
+
+        if status == "completed":
+            if batch.output_file_id is None:
+                raise RuntimeError(f"Batch {batch_id} completed but no output file.")
+            return batch.output_file_id
+
+        if status in ("failed", "expired", "cancelled"):
+            raise RuntimeError(f"Batch {batch_id} ended with status: {status}")
+
+        time.sleep(poll_interval)
+
+
+def download_and_apply_batch_results(
+    output_file_id: str,
+    df: pd.DataFrame,
+    output_dir: Path,
+    *,
+    confidence_threshold: float = 0.6,
+    model: str = BATCH_MODEL,
+) -> pd.DataFrame:
+    """Download batch results and apply labels to the DataFrame.
+
+    Parameters
+    ----------
+    output_file_id : str
+        OpenAI file ID for the batch output.
+    df : pd.DataFrame
+        Dataset to apply labels to.
+    output_dir : Path
+        Directory for labeling artifacts.
+    confidence_threshold : float
+        Min confidence to apply label.
+    model : str
+        Model name for logging.
+
+    Returns
+    -------
+    pd.DataFrame
+        Updated DataFrame with labels applied.
+    """
+    client = openai.OpenAI()
+    content = client.files.content(output_file_id)
+
+    # Load id-to-idx mapping
+    mapping_path = output_dir / "batch_id_mapping.json"
+    with open(mapping_path) as f:
+        id_to_idx: dict[str, int] = {k: int(v) for k, v in json.load(f).items()}
+
+    log_path = output_dir / "llm_labels_raw.jsonl"
+    results_path = output_dir / "batch_results_raw.jsonl"
+
+    # Save raw results
+    results_path.write_bytes(content.read())
+
+    applied = 0
+    uncertain = 0
+    errors = 0
+
+    for line in results_path.read_text().strip().split("\n"):
+        if not line:
+            continue
+        result = json.loads(line)
+        custom_id = result.get("custom_id", "")
+        idx = id_to_idx.get(custom_id)
+        if idx is None:
+            continue
+
+        response_body = result.get("response", {}).get("body", {})
+        choices = response_body.get("choices", [])
+        if not choices:
+            errors += 1
+            continue
+
+        raw_response = (choices[0].get("message", {}).get("content") or "").strip()
+        slug, confidence = parse_llm_response(raw_response)
+
+        text = str(df.at[idx, "text"])
+
+        # Log to JSONL (same format as real-time)
+        record = {
+            "sample_hash": custom_id,
+            "text_preview": text[:100],
+            "raw_response": raw_response,
+            "category_id": next(
+                (cid for cid, s in CATEGORY_ID_TO_SLUG.items() if s == slug),
+                None,
+            ),
+            "category_slug": slug,
+            "confidence": confidence,
+            "model": model,
+            "timestamp": datetime.datetime.now(tz=datetime.UTC).isoformat(),
+            "source": "batch_api",
+        }
+        append_log(log_path, record)
+
+        if slug is not None and confidence is not None:
+            if confidence >= confidence_threshold:
+                df.at[idx, "attack_category"] = slug
+                df.at[idx, "label_source"] = "gpt4o"
+                df.at[idx, "confidence"] = confidence
+                applied += 1
+            else:
+                df.at[idx, "label_source"] = "uncertain"
+                df.at[idx, "confidence"] = confidence
+                uncertain += 1
+
+    logger.info(
+        "Batch results: %d applied, %d uncertain, %d errors",
+        applied,
+        uncertain,
+        errors,
+    )
+    return df
+
+
+# ---------------------------------------------------------------------------
 # Distribution validation
 # ---------------------------------------------------------------------------
 
@@ -475,7 +735,7 @@ def validate_distribution(results_df: pd.DataFrame) -> dict[str, Any]:
     dict[str, Any]
         Report with category counts, percentages, and warnings.
     """
-    llm_labeled = results_df[results_df["label_source"] == "gpt4o_mini"]
+    llm_labeled = results_df[results_df["label_source"].isin({"gpt4o_mini", "gpt4o"})]
     total = len(llm_labeled)
 
     if total == 0:
