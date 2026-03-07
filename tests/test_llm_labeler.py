@@ -425,7 +425,8 @@ class TestLabelSamples:
         df = _make_df(n_labeled=0, n_unlabeled=2, n_benign=0)
         result = label_samples(df, confidence_threshold=0.6, output_dir=tmp_path)
 
-        labeled = result[result["label_source"] == "gpt4o_mini"]
+        # label_source is derived from model name: "gpt-4o-mini" -> "gpt_4o_mini"
+        labeled = result[result["label_source"] == "gpt_4o_mini"]
         assert len(labeled) == 2
         assert (labeled["attack_category"] == "obfuscation_encoding").all()
 

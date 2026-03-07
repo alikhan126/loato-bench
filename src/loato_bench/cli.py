@@ -125,8 +125,9 @@ def label(
     dry_run: bool = typer.Option(False, help="Preview only, no API calls."),
     output_dir: str | None = typer.Option(None, help="Output dir for labeling artifacts."),
     concurrency: int = typer.Option(8, help="Max concurrent API requests."),
+    model: str | None = typer.Option(None, help="Override model (e.g. gpt-4.1-mini)."),
 ) -> None:
-    """Label unlabeled injection samples using GPT-4o-mini."""
+    """Label unlabeled injection samples using an OpenAI model."""
     import json
     from pathlib import Path
 
@@ -174,6 +175,7 @@ def label(
         output_dir=out_path,
         dry_run=dry_run,
         concurrency=concurrency,
+        model_override=model,
     )
 
     # 6. Validate distribution

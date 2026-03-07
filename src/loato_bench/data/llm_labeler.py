@@ -258,13 +258,45 @@ async def _label_samples_async(
     max_calls: int | None = None,
     output_dir: Path,
     concurrency: int = DEFAULT_CONCURRENCY,
+    model_override: str | None = None,
 ) -> pd.DataFrame:
     """Async core: label unlabeled injection samples with concurrent API calls."""
     log_path = output_dir / "llm_labels_raw.jsonl"
 
-    # Load checkpoint
+    # Load checkpoint and apply existing results to df
     done_hashes = load_checkpoint(log_path)
     logger.info("Checkpoint: %d samples already processed.", len(done_hashes))
+
+    if done_hashes and log_path.exists():
+        checkpoint_data: dict[str, tuple[str | None, float | None]] = {}
+        with open(log_path) as f:
+            for line in f:
+                try:
+                    rec = json.loads(line)
+                    checkpoint_data[rec["sample_hash"]] = (
+                        rec.get("category_slug"),
+                        rec.get("confidence"),
+                    )
+                except (json.JSONDecodeError, KeyError):
+                    continue
+
+        # Apply checkpoint labels to unlabeled rows
+        unlabeled_mask_ckpt = (df["label"] == 1) & df["attack_category"].isna()
+        applied_from_ckpt = 0
+        for idx in df.index[unlabeled_mask_ckpt]:
+            text = str(df.at[idx, "text"])
+            sh = _text_hash(text)
+            if sh in checkpoint_data:
+                slug, conf = checkpoint_data[sh]
+                if slug and conf is not None and conf >= confidence_threshold:
+                    df.at[idx, "attack_category"] = slug
+                    df.at[idx, "label_source"] = "llm"
+                    df.at[idx, "confidence"] = conf
+                    applied_from_ckpt += 1
+                elif conf is not None:
+                    df.at[idx, "label_source"] = "uncertain"
+                    df.at[idx, "confidence"] = conf
+        logger.info("Applied %d labels from checkpoint.", applied_from_ckpt)
 
     # Build work items: (df_index, text, sample_hash)
     unlabeled_mask = (df["label"] == 1) & df["attack_category"].isna()
@@ -291,11 +323,14 @@ async def _label_samples_async(
     # Load config
     try:
         llm_config = load_llm_config()
-        model = llm_config.model
+        model = model_override or llm_config.model
         temperature = llm_config.temperature
     except Exception:
-        model = "gpt-4o-mini"
+        model = model_override or "gpt-4o-mini"
         temperature = 0.0
+
+    # Derive label_source tag from model name
+    label_source_tag = model.replace("-", "_").replace(".", "_")
 
     system_prompt = build_labeling_system_prompt()
     client = openai.AsyncOpenAI()
@@ -349,7 +384,7 @@ async def _label_samples_async(
         if slug is not None and confidence is not None:
             if confidence >= confidence_threshold:
                 df.at[idx, "attack_category"] = slug
-                df.at[idx, "label_source"] = "gpt4o_mini"
+                df.at[idx, "label_source"] = label_source_tag
                 df.at[idx, "confidence"] = confidence
             else:
                 df.at[idx, "label_source"] = "uncertain"
@@ -360,7 +395,7 @@ async def _label_samples_async(
     logger.info(
         "Labeling complete: %d API calls, %d labels applied.",
         calls_made,
-        (df["label_source"] == "gpt4o_mini").sum(),
+        df["label_source"].isin({label_source_tag}).sum(),
     )
     return df
 
@@ -373,6 +408,7 @@ def label_samples(
     output_dir: Path | None = None,
     dry_run: bool = False,
     concurrency: int = DEFAULT_CONCURRENCY,
+    model_override: str | None = None,
 ) -> pd.DataFrame:
     """Label unlabeled injection samples using GPT-4o-mini.
 
@@ -441,16 +477,19 @@ def label_samples(
             max_calls=max_calls,
             output_dir=output_dir,
             concurrency=concurrency,
+            model_override=model_override,
         )
     )
 
     # Save processed labels
-    labeled_mask = df["label_source"].isin({"gpt4o_mini", "uncertain"})
+    non_llm = {"tier1_2", "uncertain"}
+    llm_sources = {s for s in df["label_source"].dropna().unique() if s not in non_llm}
+    labeled_mask = df["label_source"].isin(llm_sources | {"uncertain"})
     if labeled_mask.any():
         cols = ["attack_category", "confidence", "label_source"]
         processed_df = df.loc[labeled_mask, cols].copy()
         processed_df["sample_hash"] = [_text_hash(str(t)) for t in df.loc[labeled_mask, "text"]]
-        processed_df["applied"] = df.loc[labeled_mask, "label_source"] == "gpt4o_mini"
+        processed_df["applied"] = df.loc[labeled_mask, "label_source"] != "uncertain"
         processed_path = output_dir / "llm_labels_processed.parquet"
         processed_df.to_parquet(processed_path, index=False)
         logger.info("Saved processed labels to %s", processed_path)
@@ -735,7 +774,11 @@ def validate_distribution(results_df: pd.DataFrame) -> dict[str, Any]:
     dict[str, Any]
         Report with category counts, percentages, and warnings.
     """
-    llm_labeled = results_df[results_df["label_source"].isin({"gpt4o_mini", "gpt4o"})]
+    # Any label_source that isn't tier1_2 or uncertain is an LLM label
+    llm_labeled = results_df[
+        results_df["label_source"].notna()
+        & ~results_df["label_source"].isin({"tier1_2", "uncertain"})
+    ]
     total = len(llm_labeled)
 
     if total == 0:
