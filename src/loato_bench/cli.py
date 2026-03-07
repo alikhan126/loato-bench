@@ -119,6 +119,104 @@ def harmonize() -> None:
 
 
 @data_app.command()
+def label(
+    confidence_threshold: float = typer.Option(0.6, help="Min confidence to apply label."),
+    max_calls: int | None = typer.Option(None, help="Max API calls (None = all)."),
+    dry_run: bool = typer.Option(False, help="Preview only, no API calls."),
+    output_dir: str | None = typer.Option(None, help="Output dir for labeling artifacts."),
+) -> None:
+    """Label unlabeled injection samples using GPT-4o-mini."""
+    import json
+    from pathlib import Path
+
+    import pandas as pd
+
+    from loato_bench.data.harmonize import filter_gentel_samples
+    from loato_bench.data.llm_labeler import label_samples, validate_distribution
+    from loato_bench.data.taxonomy import apply_taxonomy_mapping
+    from loato_bench.data.taxonomy_spec import OLD_SLUG_TO_NEW
+
+    console.print("[bold green]Labeling unlabeled injection samples...[/bold green]")
+
+    # 1. Load unified dataset
+    parquet_path = DATA_DIR / "processed" / "unified_dataset.parquet"
+    if not parquet_path.exists():
+        console.print("[red]No processed data. Run 'loato-bench data harmonize' first.[/red]")
+        raise typer.Exit(1)
+
+    df = pd.read_parquet(parquet_path)
+    console.print(f"  Loaded {len(df):,} samples")
+
+    # 2. Apply GenTel filtering
+    before = len(df)
+    df = filter_gentel_samples(df)
+    console.print(f"  GenTel filtering: {before:,} -> {len(df):,}")
+
+    # 3. Apply Tier 1+2 taxonomy mapping
+    df = apply_taxonomy_mapping(df, apply_tier3=False)
+    total_inj = (df["label"] == 1).sum()
+    mapped = df.loc[df["label"] == 1, "attack_category"].notna().sum()
+    console.print(f"  Tier 1+2 mapping: {mapped}/{total_inj} injection samples mapped")
+
+    # 4. Migrate old slugs
+    mask = df["attack_category"].notna()
+    df.loc[mask, "attack_category"] = df.loc[mask, "attack_category"].map(
+        lambda x: OLD_SLUG_TO_NEW.get(x, x)
+    )
+
+    # 5. Run LLM labeling
+    out_path = Path(output_dir) if output_dir else None
+    df = label_samples(
+        df,
+        confidence_threshold=confidence_threshold,
+        max_calls=max_calls,
+        output_dir=out_path,
+        dry_run=dry_run,
+    )
+
+    # 6. Validate distribution
+    report = validate_distribution(df)
+    if report["warnings"]:
+        for w in report["warnings"]:
+            console.print(f"  [yellow]Warning: {w}[/yellow]")
+    else:
+        console.print("  Distribution check passed.")
+
+    # 7. Save labeled dataset
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    df.to_parquet(labeled_path, index=False)
+    console.print(f"  Saved labeled dataset to {labeled_path}")
+
+    # 8. Save coverage report
+    labeling_dir = Path(output_dir) if output_dir else DATA_DIR / "labeling"
+    labeling_dir.mkdir(parents=True, exist_ok=True)
+    total_inj_final = (df["label"] == 1).sum()
+    labeled_final = df.loc[df["label"] == 1, "attack_category"].notna().sum()
+    coverage_pct = labeled_final / total_inj_final * 100 if total_inj_final > 0 else 0.0
+    uncertain_count = (
+        (df["label_source"] == "uncertain").sum() if "label_source" in df.columns else 0
+    )
+
+    coverage_report = {
+        "total_injection": int(total_inj_final),
+        "labeled": int(labeled_final),
+        "coverage_pct": round(float(coverage_pct), 2),
+        "uncertain_pool": int(uncertain_count),
+        "category_counts": report.get("category_counts", {}),
+    }
+    coverage_path = labeling_dir / "coverage_report.json"
+    with open(coverage_path, "w") as f:
+        json.dump(coverage_report, f, indent=2)
+    console.print(f"  Saved coverage report to {coverage_path}")
+
+    # 9. Summary
+    console.print("\n[bold green]Labeling complete![/bold green]")
+    console.print(f"  Coverage: {labeled_final}/{total_inj_final} ({coverage_pct:.1f}%)")
+    if report["category_counts"]:
+        console.print(f"  LLM labels: {report['category_counts']}")
+
+
+@data_app.command()
 def split(
     apply_filter: bool = typer.Option(True, help="Apply GenTel filtering."),
     apply_merges: bool = typer.Option(True, help="Merge small taxonomy categories."),
