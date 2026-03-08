@@ -24,31 +24,17 @@ class TestDataSplitCLI:
         assert result.exit_code == 0
         assert "Generate all evaluation splits" in result.output
 
-    def test_shows_gentel_filtering_option(self) -> None:
+    def test_shows_min_samples_option(self) -> None:
         result = runner.invoke(app, ["data", "split", "--help"])
         clean = _strip_ansi(result.output)
-        assert "--apply-filter" in clean or "--no-apply-filter" in clean
-
-    def test_shows_merge_option(self) -> None:
-        result = runner.invoke(app, ["data", "split", "--help"])
-        clean = _strip_ansi(result.output)
-        assert "--apply-merges" in clean or "--no-apply-merges" in clean
-
-    def test_shows_tier3_option(self) -> None:
-        result = runner.invoke(app, ["data", "split", "--help"])
-        clean = _strip_ansi(result.output)
-        assert "--apply-tier3" in clean or "--no-apply-tier3" in clean
+        assert "--min-samples" in clean
 
     def test_shows_output_dir_option(self) -> None:
         result = runner.invoke(app, ["data", "split", "--help"])
         clean = _strip_ansi(result.output)
         assert "--output-dir" in clean
 
-    def test_fails_without_data(self) -> None:
-        """Without unified_dataset.parquet, should exit with error."""
+    def test_fails_without_labeled_data(self) -> None:
+        """Without labeled_v1.parquet, should exit with error."""
         result = runner.invoke(app, ["data", "split", "--output-dir", "/tmp/test_splits_none"])
-        # Should fail because no parquet file exists at default path
-        # (unless user has run the pipeline)
-        assert (
-            result.exit_code != 0 or "No processed data" in result.output or len(result.output) > 0
-        )
+        assert result.exit_code != 0 or "No labeled data" in result.output or len(result.output) > 0
