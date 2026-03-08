@@ -368,6 +368,7 @@ def load_splits(path: Path) -> dict[str, Any]:
 def generate_all_splits(
     df: pd.DataFrame,
     output_dir: Path | None = None,
+    min_loato_samples: int = 200,
 ) -> dict[str, Path]:
     """Generate all 4 split types and save to *output_dir*.
 
@@ -412,6 +413,7 @@ def generate_all_splits(
         loato_splits = generate_loato_splits(
             df,
             benign_test_fraction=loato_cfg.benign_test_fraction or 0.2,
+            min_samples=min_loato_samples,
             seed=loato_cfg.seed,
         )
         loato_path = output_dir / "loato_splits.json"
