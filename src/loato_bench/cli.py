@@ -334,57 +334,36 @@ def label_batch(
 
 @data_app.command()
 def split(
-    apply_filter: bool = typer.Option(True, help="Apply GenTel filtering."),
-    apply_merges: bool = typer.Option(True, help="Merge small taxonomy categories."),
-    apply_tier3: bool = typer.Option(False, help="Run Tier 3 LLM taxonomy mapping."),
+    min_samples: int = typer.Option(150, help="Min samples per category for LOATO."),
     output_dir: str | None = typer.Option(None, help="Output directory for splits."),
 ) -> None:
-    """Generate all evaluation splits (standard CV, LOATO, transfer)."""
+    """Generate all evaluation splits from the labeled dataset."""
     from pathlib import Path
 
     import pandas as pd
 
-    from loato_bench.data.harmonize import filter_gentel_samples
     from loato_bench.data.splits import generate_all_splits
-    from loato_bench.data.taxonomy import (
-        apply_taxonomy_mapping,
-        merge_small_categories,
-    )
 
     console.print("[bold green]Generating splits...[/bold green]")
 
-    # 1. Load unified dataset
-    parquet_path = DATA_DIR / "processed" / "unified_dataset.parquet"
-    if not parquet_path.exists():
-        console.print("[red]No processed data. Run 'loato-bench data harmonize' first.[/red]")
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    if not labeled_path.exists():
+        console.print("[red]No labeled data. Run 'loato-bench data label' first.[/red]")
         raise typer.Exit(1)
 
-    df = pd.read_parquet(parquet_path)
-    console.print(f"  Loaded {len(df):,} samples")
+    df = pd.read_parquet(labeled_path)
+    console.print(f"  Loaded {len(df):,} samples from labeled_v1.parquet")
 
-    # 2. Optionally filter GenTel
-    if apply_filter:
-        before = len(df)
-        df = filter_gentel_samples(df)
-        console.print(f"  GenTel filtering: {before:,} → {len(df):,}")
-
-    # 3. Apply taxonomy mapping (Tier 1+2, optionally Tier 3)
-    df = apply_taxonomy_mapping(df, apply_tier3=apply_tier3)
-    mapped = df["attack_category"].notna().sum()
     total_inj = (df["label"] == 1).sum()
-    console.print(f"  Taxonomy: {mapped}/{total_inj} injection samples mapped")
+    mapped = df.loc[df["label"] == 1, "attack_category"].notna().sum()
+    console.print(f"  Taxonomy coverage: {mapped}/{total_inj} injection samples")
 
-    # 4. Optionally merge small categories
-    if apply_merges:
-        df = merge_small_categories(df)
-        cats = df[df["label"] == 1]["attack_category"].value_counts()
-        console.print(f"  Categories after merge: {cats.to_dict()}")
+    cats = df[df["label"] == 1]["attack_category"].value_counts()
+    console.print(f"  Categories: {cats.to_dict()}")
 
-    # 5. Generate all splits
     out = Path(output_dir) if output_dir else None
-    saved = generate_all_splits(df, output_dir=out)
+    saved = generate_all_splits(df, output_dir=out, min_loato_samples=min_samples)
 
-    # 6. Summary
     console.print(f"\n[bold green]Generated {len(saved)} split files:[/bold green]")
     for name, path in saved.items():
         console.print(f"  {name}: {path}")
