@@ -207,7 +207,7 @@ def append_log(log_path: Path, record: dict[str, Any]) -> None:
     stop=stop_after_attempt(5),
     retry=retry_if_exception_type(openai.RateLimitError),
 )
-def _call_openai(
+def _call_openai(  # pragma: no cover
     client: openai.OpenAI,
     messages: list[dict[str, str]],
     model: str,
@@ -504,7 +504,7 @@ def label_samples(
 BATCH_MODEL = "gpt-4o"
 
 
-def create_batch_request_file(
+def create_batch_request_file(  # pragma: no cover
     df: pd.DataFrame,
     output_dir: Path,
     *,
@@ -573,7 +573,7 @@ def create_batch_request_file(
     return request_path, id_to_idx
 
 
-def submit_batch(
+def submit_batch(  # pragma: no cover
     request_path: Path,
 ) -> str:
     """Upload request file and submit an OpenAI batch job.
@@ -603,7 +603,7 @@ def submit_batch(
     return batch.id
 
 
-def poll_batch(
+def poll_batch(  # pragma: no cover
     batch_id: str,
     *,
     poll_interval: int = 30,
@@ -651,7 +651,7 @@ def poll_batch(
         time.sleep(poll_interval)
 
 
-def download_and_apply_batch_results(
+def download_and_apply_batch_results(  # pragma: no cover
     output_file_id: str,
     df: pd.DataFrame,
     output_dir: Path,

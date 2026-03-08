@@ -430,6 +430,67 @@ class TestLabelSamples:
         assert len(labeled) == 2
         assert (labeled["attack_category"] == "obfuscation_encoding").all()
 
+    @patch("loato_bench.data.llm_labeler.openai.AsyncOpenAI")
+    @patch("loato_bench.data.llm_labeler.load_llm_config")
+    def test_checkpoint_replay_applies_existing_labels(
+        self, mock_config: MagicMock, mock_async_cls: MagicMock, tmp_path: Path
+    ) -> None:
+        """Re-running applies labels from checkpoint without new API calls."""
+        mock_config.return_value = MagicMock(model="gpt-4o-mini", temperature=0.0)
+
+        df = _make_df(n_labeled=0, n_unlabeled=3, n_benign=0)
+
+        # Pre-populate checkpoint with results for all 3 samples
+        from loato_bench.data.taxonomy import _text_hash
+
+        log_path = tmp_path / "llm_labels_raw.jsonl"
+        for i in range(3):
+            text = f"unlabeled injection {i}"
+            record = {
+                "sample_hash": _text_hash(text),
+                "text_preview": text[:100],
+                "raw_response": '{"category": "C2", "confidence": 0.9}',
+                "category_id": "C2",
+                "category_slug": "jailbreak_roleplay",
+                "confidence": 0.9,
+                "model": "gpt-4o-mini",
+                "timestamp": "2026-01-01T00:00:00+00:00",
+            }
+            append_log(log_path, record)
+
+        # All samples are checkpointed — no new API calls
+        mock_client = _mock_async_client()
+        mock_async_cls.return_value = mock_client
+        result = label_samples(df, confidence_threshold=0.6, output_dir=tmp_path)
+
+        # No API calls made (all found in checkpoint)
+        mock_client.chat.completions.create.assert_not_called()
+
+        # But labels should be applied from checkpoint
+        labeled = result[result["attack_category"] == "jailbreak_roleplay"]
+        assert len(labeled) == 3
+
+    @patch("loato_bench.data.llm_labeler.openai.AsyncOpenAI")
+    @patch("loato_bench.data.llm_labeler.load_llm_config")
+    def test_model_override(
+        self, mock_config: MagicMock, mock_async_cls: MagicMock, tmp_path: Path
+    ) -> None:
+        """model_override uses the specified model instead of config."""
+        mock_config.return_value = MagicMock(model="gpt-4o-mini", temperature=0.0)
+        mock_client = _mock_async_client(category="C1", confidence=0.9)
+        mock_async_cls.return_value = mock_client
+
+        df = _make_df(n_labeled=0, n_unlabeled=1, n_benign=0)
+        result = label_samples(df, output_dir=tmp_path, model_override="gpt-4.1-mini")
+
+        # Should use overridden model in API call
+        call_kwargs = mock_client.chat.completions.create.call_args
+        assert call_kwargs.kwargs["model"] == "gpt-4.1-mini"
+
+        # label_source derived from model name
+        labeled = result[result["label_source"] == "gpt_4_1_mini"]
+        assert len(labeled) == 1
+
 
 # ---------------------------------------------------------------------------
 # TestValidateDistribution
