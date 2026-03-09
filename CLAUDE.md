@@ -90,11 +90,18 @@ src/loato_bench/
 configs/              # YAML configs for embeddings, classifiers, experiments, data, analysis
   analysis/eda.yaml   # EDA params (GenTel filtering, text analysis, visualization, split feasibility)
   data/taxonomy.yaml  # Attack category definitions + regex patterns
-data/                 # (gitignored) raw/ → processed/ → embeddings/ → splits/
+data/                 # Mostly gitignored — selective files tracked via LFS (see below)
+  processed/          # labeled_v1.parquet, unified_dataset.parquet (LFS-tracked)
+  splits/             # 4 split index JSONs + split_manifest.json (LFS-tracked)
+  labeling/           # Audit trail: coverage/labeling reports, llm_labels_raw.jsonl
+  raw/                # (gitignored) downloaded source datasets
+  embeddings/         # (gitignored) .npz caches per model
+  review/             # (future, Sprint 2A-03) error_rate_report.csv, manual_overrides.csv
 results/              # (gitignored) models, metrics, figures
   eda/                # EDA outputs: figures/*.png, *.json reports
 docs/                 # Documentation (NEW - Sprint 1A)
   eda.md              # Comprehensive EDA guide (28KB) — goals, methodology, findings, how-to
+  taxonomy_spec_v1.0.md # Taxonomy v1.0 specification (7 categories)
   README.md           # Docs navigation
 notebooks/            # Jupyter notebooks
   01_exploratory_data_analysis.ipynb  # Interactive EDA (50+ cells)
@@ -171,7 +178,7 @@ Stats: bootstrap 95% CIs (10K resamples), McNemar, Friedman + Nemenyi, Cohen's d
 - [x] Sprint 0: Scaffolding, ABCs, CLI, configs
 - [x] Sprint 1A: Data pipeline + EDA (5/5 loaders, harmonization, quality gate, taxonomy Tier 1+2, EDA complete with docs)
 - [x] Sprint 1B: Embedding pipeline (5 models, cache, W&B utils) — all implemented + tested
-- [ ] Sprint 2A: Taxonomy finalization (Tier 3 LLM) + split generation (use EDA findings)
+- [x] Sprint 2A: Taxonomy finalization (Tier 3 LLM labeling, 7-category v1.0) + split generation + data artifacts tracked in Git LFS
 - [ ] Sprint 2B: Classifier implementations + training pipeline + sweeps
 - [ ] Sprint 3: Core experiments (Standard CV + LOATO)
 - [ ] Sprint 4A: Transfer experiments (direct→indirect, cross-lingual, LLM baseline)
@@ -202,19 +209,87 @@ Stats: bootstrap 95% CIs (10K resamples), McNemar, Friedman + Nemenyi, Cohen's d
 3. Apply Tier 3 LLM to unmapped samples (scope: ~30% of samples)
 4. Generate LOATO splits (validated categories only)
 
-## Taxonomy Categories (Draft — To Be Finalized in Sprint 2A)
+## Taxonomy v1.0 (Finalized — Sprint 2A)
 
-8 attack categories mapped via 3-tier system:
-1. `instruction_override` — "Ignore previous instructions"
-2. `jailbreak_roleplay` — "Pretend you are DAN"
-3. `context_manipulation` — "Reveal your system prompt"
-4. `obfuscation_encoding` — Base64/ROT13 encoding
-5. `payload_splitting` — Multi-turn attacks
-6. `information_extraction` — Training data extraction
-7. `indirect_injection` — Via documents/web pages
-8. `social_engineering` — Emotional manipulation
+7 attack categories (C1–C7), defined in `src/loato_bench/data/taxonomy_spec.py` and exported to `configs/final_categories.json`:
 
-Merge rule: Categories with <50 samples after EDA get merged into larger categories.
+| ID | Slug | Name | LOATO Eligible |
+|----|------|------|:--------------:|
+| C1 | `instruction_override` | Instruction Override | Yes |
+| C2 | `jailbreak_roleplay` | Jailbreak / Roleplay | Yes |
+| C3 | `obfuscation_encoding` | Obfuscation / Encoding | Yes |
+| C4 | `information_extraction` | Information Extraction | Yes |
+| C5 | `social_engineering` | Social Engineering | Yes |
+| C6 | `context_manipulation` | Context Manipulation / Indirect Injection | Yes |
+| C7 | `other` | Other / Multi-Strategy | No |
+
+**Migration from 8-slug draft**: Old `context_manipulation` (system prompt extraction) → C4; old `indirect_injection` → C6; old `payload_splitting` (<50 samples) → C7. See `OLD_SLUG_TO_NEW` in `taxonomy_spec.py`.
+
+## Git LFS & Data Tracking
+
+### What's Tracked (committed to repo)
+
+Large binary/data files are stored via **Git LFS** (`.gitattributes`):
+
+| File | Size | Storage | Purpose |
+|------|------|---------|---------|
+| `data/processed/labeled_v1.parquet` | 5.4MB | LFS | Final labeled dataset (32,683 samples) |
+| `data/processed/unified_dataset.parquet` | 6.5MB | LFS | Pre-labeling harmonized dataset |
+| `data/splits/standard_cv_folds.json` | 2.3MB | LFS | Stratified 5-fold CV indices |
+| `data/splits/loato_splits.json` | 3.3MB | LFS | LOATO fold indices (6 folds) |
+| `data/splits/crosslingual_split.json` | 341KB | LFS | Cross-lingual split indices |
+| `data/splits/direct_indirect_split.json` | 340KB | LFS | Direct→indirect split indices |
+| `data/splits/split_manifest.json` | 1KB | LFS | SHA-256 checksums of all splits |
+| `data/labeling/llm_labels_raw.jsonl` | 5MB | LFS | Raw GPT-4o-mini labeling output (audit trail) |
+
+Small metadata files tracked via regular Git:
+
+| File | Purpose |
+|------|---------|
+| `data/labeling/coverage_report.json` | Labeling coverage statistics |
+| `data/labeling/labeling_report.json` | Labeling pipeline summary |
+| `configs/final_categories.json` | Taxonomy v1.0 export (7 categories) |
+| `docs/taxonomy_spec_v1.0.md` | Taxonomy specification document |
+
+### What's Gitignored (NOT committed)
+
+| Path | Why |
+|------|-----|
+| `data/raw/` | Downloaded source datasets (reproducible via `loato-bench data download`) |
+| `data/embeddings/` | `.npz` caches (reproducible via `loato-bench embed run`) |
+| `data/processed/*` (except two parquets) | Intermediate processing artifacts |
+| `data/labeling/*` (except 3 audit files) | Batch request files, intermediate processing |
+| `results/` | All experiment outputs (models, metrics, figures) |
+| `.env` | API keys (OPENAI, WANDB) |
+
+### Pre-wired for Future Tracking (Sprint 2A-03)
+
+These paths have `.gitignore` negation rules ready but files don't exist yet:
+- `data/review/error_rate_report.csv` — Manual review error analysis
+- `data/review/manual_overrides.csv` — Human corrections to LLM labels
+
+### LFS Patterns (`.gitattributes`)
+
+```
+*.parquet    → LFS (all parquet files)
+*.npy        → LFS (numpy arrays)
+*.npz        → LFS (compressed numpy, currently gitignored but LFS-ready)
+data/splits/*.json → LFS (split index files are large)
+data/labeling/llm_labels_raw.jsonl → LFS
+```
+
+### Adding New Data Files
+
+To track a new data file:
+1. If >1MB, ensure the extension/path is in `.gitattributes` for LFS
+2. Add a negation rule to `.gitignore` (e.g., `!/data/new_dir/file.ext`)
+3. Use `git add -f data/path/to/file` (force-add past gitignore)
+4. If it contains SHA-256 hashes, exclude its path from detect-secrets in `.pre-commit-config.yaml`
+5. Update `split_manifest.json` if it's a new split file
+
+### Gotcha: detect-secrets
+
+`data/` is excluded from detect-secrets scanning (`.pre-commit-config.yaml`) because SHA-256 hashes and hex strings in data files trigger false positives. This is intentional — actual secrets (API keys) are in `.env` which is gitignored.
 
 ## Conventions
 
@@ -278,7 +353,15 @@ uv run pre-commit run --all-files && uv run pytest tests/ -v
 **Before modifying data pipeline**:
 - `src/loato_bench/data/base.py` — UnifiedSample schema (don't break this)
 - `src/loato_bench/data/harmonize.py` — Dedup + language detection pipeline
-- `configs/data/taxonomy.yaml` — Category definitions + regex patterns
+- `src/loato_bench/data/taxonomy_spec.py` — Taxonomy v1.0 (TAXONOMY_V1, single source of truth)
+- `src/loato_bench/data/llm_labeler.py` — GPT-4o-mini batch labeling pipeline
+- `configs/data/taxonomy.yaml` — Category definitions + regex patterns (Tier 1+2)
+- `configs/final_categories.json` — Machine-readable taxonomy export (keep in sync with taxonomy_spec.py)
+
+**Before modifying splits or data tracking**:
+- `.gitattributes` — LFS tracking patterns
+- `.gitignore` — Negation rules for tracked data paths
+- `data/splits/split_manifest.json` — SHA-256 checksums (update after regenerating splits)
 
 **Before modifying EDA**:
 - `docs/eda.md` — Methodology documentation (keep in sync with code)
@@ -296,10 +379,11 @@ uv run pre-commit run --all-files && uv run pytest tests/ -v
 
 ## Documentation
 
-- **README.md**: Project overview, setup, usage, experiment matrix
+- **README.md**: Project overview, setup, data tracking, usage, experiment matrix
+- **CLAUDE.md**: This file (architecture, conventions, data tracking, gotchas)
 - **docs/eda.md**: Comprehensive EDA guide (goals, methodology, findings, recommendations)
+- **docs/taxonomy_spec_v1.0.md**: Taxonomy v1.0 specification (7 categories, boundary rules)
 - **docs/README.md**: Documentation navigation
-- **CLAUDE.md**: This file (architecture, conventions, gotchas)
 - Code docstrings: Google-style (Parameters, Returns, Raises sections)
 
 ## W&B Integration

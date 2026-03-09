@@ -40,4 +40,4 @@ repos:
     hooks:
       - id: detect-secrets
         args: [--baseline, .secrets.baseline]
-        exclude: uv\.lock
+        exclude: uv\.lock|^data/
