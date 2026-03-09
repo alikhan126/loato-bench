@@ -57,12 +57,66 @@ LOATO-Bench studies whether embedding-based prompt injection classifiers trained
 | **Direct → Indirect** | Train on direct injections, test on indirect |
 | **Cross-lingual** | Train on English, test on non-English |
 
+## Data & Reproducibility
+
+### Git LFS
+
+This repo uses **Git LFS** for large data files. Install it before cloning:
+
+```bash
+# Install Git LFS (one-time)
+brew install git-lfs   # macOS
+git lfs install
+
+# Clone (LFS files download automatically)
+git clone <repo-url>
+```
+
+### Tracked Data Artifacts
+
+Key data files are committed for reproducibility and audit:
+
+| File | Size | Storage | Purpose |
+|------|------|---------|---------|
+| `data/processed/labeled_v1.parquet` | 5.4MB | LFS | Final labeled dataset (32,683 samples, taxonomy v1.0) |
+| `data/processed/unified_dataset.parquet` | 6.5MB | LFS | Pre-labeling harmonized dataset |
+| `data/splits/*.json` (4 files) | 6.3MB | LFS | Train/test index files for all 4 experiment protocols |
+| `data/splits/split_manifest.json` | 1KB | LFS | SHA-256 checksums for reproducibility verification |
+| `data/labeling/llm_labels_raw.jsonl` | 5MB | LFS | Raw GPT-4o-mini labeling output (audit trail) |
+| `data/labeling/coverage_report.json` | 2KB | Git | Labeling coverage statistics |
+| `data/labeling/labeling_report.json` | 2KB | Git | Labeling pipeline summary |
+| `configs/final_categories.json` | 2KB | Git | Taxonomy v1.0 category definitions |
+
+### What's NOT Tracked (gitignored)
+
+| Path | Reproducible via |
+|------|------------------|
+| `data/raw/` | `uv run loato-bench data download` |
+| `data/embeddings/` | `uv run loato-bench embed run --all` |
+| `results/` | Re-run experiments |
+| `.env` | Copy from `.env.example` |
+
+### Attack Taxonomy (v1.0)
+
+7 categories (6 LOATO-eligible), defined in `src/loato_bench/data/taxonomy_spec.py`:
+
+| ID | Category | Mechanism |
+|----|----------|-----------|
+| C1 | Instruction Override | "Ignore previous instructions" |
+| C2 | Jailbreak / Roleplay | Persona adoption to bypass safety |
+| C3 | Obfuscation / Encoding | Base64, ROT13, leetspeak evasion |
+| C4 | Information Extraction | System prompt / training data extraction |
+| C5 | Social Engineering | Emotional manipulation, authority claims |
+| C6 | Context Manipulation | Indirect injection via documents/tools |
+| C7 | Other / Multi-Strategy | Catch-all (not LOATO-eligible) |
+
 ## Setup
 
 ### Prerequisites
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) package manager
+- [Git LFS](https://git-lfs.com/) for large data files
 - Apple Silicon Mac (MPS backend) recommended, CPU works too
 
 ### Installation
@@ -140,27 +194,39 @@ uv run pytest tests/ -v
 ```
 loato-bench/
 ├── pyproject.toml
+├── .gitattributes        # Git LFS tracking rules
 ├── Justfile
 ├── configs/
-│   ├── data/           # sources.yaml, taxonomy.yaml
-│   ├── embeddings/     # one YAML per embedding model
-│   ├── classifiers/    # one YAML per classifier
-│   └── experiments/    # one YAML per experiment protocol
+│   ├── data/             # sources.yaml, taxonomy.yaml
+│   ├── embeddings/       # one YAML per embedding model
+│   ├── classifiers/      # one YAML per classifier
+│   ├── experiments/      # one YAML per experiment protocol
+│   └── final_categories.json  # Taxonomy v1.0 export
 ├── src/loato_bench/
-│   ├── cli.py          # Typer CLI entrypoints
-│   ├── data/           # Dataset loaders, harmonization, taxonomy, splits
-│   ├── embeddings/     # Embedding model implementations + cache
-│   ├── classifiers/    # Classifier implementations (LogReg, SVM, XGB, MLP)
-│   ├── evaluation/     # LOATO protocol, metrics, transfer, statistical tests
-│   ├── analysis/       # Visualization, SHAP analysis, report generation
-│   ├── tracking/       # W&B integration
-│   └── utils/          # Config loading, device selection, reproducibility
-├── notebooks/          # EDA, embedding viz, results analysis, SHAP
-├── data/               # (gitignored) raw → processed → embeddings → splits
-├── results/            # (gitignored) models, metrics, figures
-├── scripts/            # Setup scripts (e.g., GGUF model download)
-└── tests/              # pytest test suite
+│   ├── cli.py            # Typer CLI entrypoints
+│   ├── data/             # Dataset loaders, harmonization, taxonomy, splits
+│   │   ├── taxonomy_spec.py   # Taxonomy v1.0 (single source of truth)
+│   │   └── llm_labeler.py     # GPT-4o-mini batch labeling
+│   ├── embeddings/       # Embedding model implementations + cache
+│   ├── classifiers/      # Classifier implementations (LogReg, SVM, XGB, MLP)
+│   ├── evaluation/       # LOATO protocol, metrics, transfer, statistical tests
+│   ├── analysis/         # Visualization, SHAP analysis, report generation
+│   ├── tracking/         # W&B integration
+│   └── utils/            # Config loading, device selection, reproducibility
+├── data/                 # Selectively tracked (see Data & Reproducibility above)
+│   ├── processed/        # ★ labeled_v1.parquet, unified_dataset.parquet (LFS)
+│   ├── splits/           # ★ 4 split JSONs + manifest (LFS)
+│   ├── labeling/         # ★ Audit trail (reports + raw labels)
+│   ├── raw/              # (gitignored) source datasets
+│   └── embeddings/       # (gitignored) .npz caches
+├── results/              # (gitignored) models, metrics, figures
+├── docs/                 # EDA guide, taxonomy spec
+├── notebooks/            # EDA, embedding viz, results analysis, SHAP
+├── scripts/              # Setup scripts (e.g., GGUF model download)
+└── tests/                # pytest test suite
 ```
+
+★ = committed to repo (Git LFS for large files)
 
 ## Experiment Matrix
 
