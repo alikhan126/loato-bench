@@ -1,0 +1,87 @@
+{
+  "dataset_summary": {
+    "total_samples": 32683,
+    "injection_samples": 30849,
+    "benign_samples": 1834
+  },
+  "coverage": {
+    "labeled_injection": 29767,
+    "total_injection": 30849,
+    "coverage_pct": 96.49,
+    "target_pct": 90.0,
+    "target_met": true
+  },
+  "label_sources": {
+    "tier1_2": 16418,
+    "llm": 13322,
+    "uncertain": 1065,
+    "gpt_4_1_mini": 27
+  },
+  "category_distribution": {
+    "instruction_override": 19138,
+    "other": 7273,
+    "jailbreak_roleplay": 1613,
+    "information_extraction": 708,
+    "obfuscation_encoding": 544,
+    "social_engineering": 303,
+    "context_manipulation": 188
+  },
+  "category_percentages": {
+    "instruction_override": 64.29,
+    "other": 24.43,
+    "jailbreak_roleplay": 5.42,
+    "information_extraction": 2.38,
+    "obfuscation_encoding": 1.83,
+    "social_engineering": 1.02,
+    "context_manipulation": 0.63
+  },
+  "llm_confidence_stats": {
+    "mean": 0.648,
+    "median": 0.85,
+    "min": 0.1,
+    "max": 1.0,
+    "std": 0.332
+  },
+  "uncertain_pool": 1065,
+  "loato_feasibility": {
+    "standard_threshold": 200,
+    "relaxed_threshold": 150,
+    "categories": {
+      "instruction_override": {
+        "count": 19138,
+        "feasible_200": true,
+        "feasible_150": true
+      },
+      "jailbreak_roleplay": {
+        "count": 1613,
+        "feasible_200": true,
+        "feasible_150": true
+      },
+      "information_extraction": {
+        "count": 708,
+        "feasible_200": true,
+        "feasible_150": true
+      },
+      "obfuscation_encoding": {
+        "count": 544,
+        "feasible_200": true,
+        "feasible_150": true
+      },
+      "social_engineering": {
+        "count": 303,
+        "feasible_200": true,
+        "feasible_150": true
+      },
+      "context_manipulation": {
+        "count": 188,
+        "feasible_200": false,
+        "feasible_150": true
+      }
+    },
+    "all_feasible_standard": false,
+    "all_feasible_relaxed": true,
+    "notes": [
+      "context_manipulation has 188 samples (< 200). Data scarcity from source datasets (185/188 from HackAPrompt). Passes relaxed threshold of 150."
+    ]
+  }
+}

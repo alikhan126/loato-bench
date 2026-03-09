@@ -1,0 +1,56 @@
+{
+  "taxonomy_version": "1.0",
+  "n_categories": 7,
+  "loato_eligible_count": 6,
+  "categories": [
+    {
+      "id": "C1",
+      "name": "Instruction Override",
+      "slug": "instruction_override",
+      "mechanism": "Directly instructs the model to ignore, disregard, or replace its prior instructions with attacker-supplied ones.",
+      "loato_eligible": true
+    },
+    {
+      "id": "C2",
+      "name": "Jailbreak / Roleplay",
+      "slug": "jailbreak_roleplay",
+      "mechanism": "Adopts a fictional persona, roleplay scenario, or hypothetical framing to bypass safety constraints.",
+      "loato_eligible": true
+    },
+    {
+      "id": "C3",
+      "name": "Obfuscation / Encoding",
+      "slug": "obfuscation_encoding",
+      "mechanism": "Encodes, transforms, or obfuscates the malicious payload to evade input filters (Base64, ROT13, leetspeak, token smuggling, etc.).",
+      "loato_eligible": true
+    },
+    {
+      "id": "C4",
+      "name": "Information Extraction",
+      "slug": "information_extraction",
+      "mechanism": "Attempts to extract confidential information: system prompts, training data, internal state, passwords, or API keys.",
+      "loato_eligible": true
+    },
+    {
+      "id": "C5",
+      "name": "Social Engineering",
+      "slug": "social_engineering",
+      "mechanism": "Uses emotional manipulation, urgency, authority claims, or guilt to pressure the model into compliance.",
+      "loato_eligible": true
+    },
+    {
+      "id": "C6",
+      "name": "Context Manipulation / Indirect Injection",
+      "slug": "context_manipulation",
+      "mechanism": "Injects malicious instructions via external content consumed by the model (documents, web pages, tool outputs, hidden text, markdown images).",
+      "loato_eligible": true
+    },
+    {
+      "id": "C7",
+      "name": "Other / Multi-Strategy",
+      "slug": "other",
+      "mechanism": "Catch-all for attacks that do not fit C1--C6, use multiple strategies without a clear primary, or represent payload splitting across turns.",
+      "loato_eligible": false
+    }
+  ]
+}
