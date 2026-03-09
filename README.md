@@ -57,58 +57,114 @@ LOATO-Bench studies whether embedding-based prompt injection classifiers trained
 | **Direct → Indirect** | Train on direct injections, test on indirect |
 | **Cross-lingual** | Train on English, test on non-English |
 
+## Data Pipeline
+
+The benchmark dataset is built from 5 public sources through a multi-stage pipeline:
+
+```
+5 raw datasets → harmonize (dedup + normalize) → unified_dataset.parquet (32,683 samples)
+                                                          ↓
+                                              3-tier taxonomy labeling
+                                              (source maps → regex → GPT-4o-mini)
+                                                          ↓
+                                                labeled_v1.parquet
+                                                          ↓
+                                              4 experiment split files
+```
+
+**Harmonization** (Sprint 1A): Each dataset loader produces `UnifiedSample` records. The harmonizer applies NFC unicode normalization, exact deduplication (SHA-256), near-deduplication (MinHash LSH, Jaccard 0.90, word 5-grams), and language detection. GenTel-Bench is quality-gated via heuristic injection confidence scoring (threshold=0.4, capped at 5K samples) because its original categories describe content harm, not injection technique.
+
+**Taxonomy labeling** (Sprint 2A): Samples are assigned to 7 attack categories using a 3-tier system. Tier 1 maps known source-specific labels (e.g., Open-Prompt "jailbreak" → `jailbreak_roleplay`). Tier 2 applies regex patterns for common signals (e.g., "ignore previous" → `instruction_override`). Tier 3 uses GPT-4o-mini via OpenAI's Batch API for samples that Tiers 1+2 couldn't classify (~30% of injections). The raw LLM outputs are preserved as an audit trail.
+
+**Split generation** (Sprint 2A): Four sets of train/test index files are generated — one per evaluation protocol. Splits store integer indices referencing rows in `labeled_v1.parquet`, not the data itself, keeping them portable and deterministic (seed=42).
+
 ## Data & Reproducibility
 
-### Git LFS
+### Why Git LFS?
 
-This repo uses **Git LFS** for large data files. Install it before cloning:
+Several data files (parquet datasets, split indices, labeling outputs) are between 1–7MB each. GitHub rejects files over 100MB and warns above 50MB, and committing multi-megabyte binaries directly bloats the repo's clone size permanently (they can't be garbage-collected from git history). Git LFS replaces these files with lightweight pointers in the repo while storing the actual content on a separate LFS server. This keeps `git clone` fast while still versioning the data.
+
+### Git LFS Setup
+
+**Git LFS must be installed before cloning**, otherwise you'll get 130-byte pointer files instead of actual data.
 
 ```bash
-# Install Git LFS (one-time)
+# Install Git LFS (one-time per machine)
 brew install git-lfs   # macOS
-git lfs install
+git lfs install        # configures git hooks
 
-# Clone (LFS files download automatically)
+# Then clone normally — LFS files download automatically
 git clone <repo-url>
 ```
 
-### Tracked Data Artifacts
+If you already cloned without LFS, retroactively fetch the real files:
 
-Key data files are committed for reproducibility and audit:
+```bash
+git lfs install
+git lfs pull
+```
 
-| File | Size | Storage | Purpose |
-|------|------|---------|---------|
-| `data/processed/labeled_v1.parquet` | 5.4MB | LFS | Final labeled dataset (32,683 samples, taxonomy v1.0) |
-| `data/processed/unified_dataset.parquet` | 6.5MB | LFS | Pre-labeling harmonized dataset |
-| `data/splits/*.json` (4 files) | 6.3MB | LFS | Train/test index files for all 4 experiment protocols |
-| `data/splits/split_manifest.json` | 1KB | LFS | SHA-256 checksums for reproducibility verification |
-| `data/labeling/llm_labels_raw.jsonl` | 5MB | LFS | Raw GPT-4o-mini labeling output (audit trail) |
-| `data/labeling/coverage_report.json` | 2KB | Git | Labeling coverage statistics |
-| `data/labeling/labeling_report.json` | 2KB | Git | Labeling pipeline summary |
-| `configs/final_categories.json` | 2KB | Git | Taxonomy v1.0 category definitions |
+### What's Tracked and Why
 
-### What's NOT Tracked (gitignored)
+We commit only the files that are **hard to reproduce** (require API calls, manual review, or represent the exact dataset the experiments run on) or that serve as an **audit trail** for the committee. Everything that's cheap to regenerate from code is gitignored.
 
-| Path | Reproducible via |
+#### Datasets (LFS)
+
+| File | Size | Why it's tracked |
+|------|------|------------------|
+| `data/processed/unified_dataset.parquet` | 6.5MB | The harmonized benchmark before labeling — proves the dedup/filtering pipeline output. Regenerating requires downloading all 5 source datasets and re-running harmonization. |
+| `data/processed/labeled_v1.parquet` | 5.4MB | The final labeled dataset (32,683 samples) that all experiments run on. This is the single artifact that must be identical across all experiment runs for results to be comparable. |
+
+#### Splits (LFS)
+
+| File | Size | Why it's tracked |
+|------|------|------------------|
+| `data/splits/standard_cv_folds.json` | 2.3MB | 5-fold stratified CV indices. Exact fold assignments matter for reproducibility — even with the same seed, library version differences could produce different splits. |
+| `data/splits/loato_splits.json` | 3.3MB | LOATO fold indices (6 folds, one per eligible category). This is the core evaluation protocol — the primary contribution of the thesis. |
+| `data/splits/direct_indirect_split.json` | 340KB | Direct→indirect transfer experiment indices. |
+| `data/splits/crosslingual_split.json` | 341KB | English→non-English transfer experiment indices. |
+| `data/splits/split_manifest.json` | 1KB | SHA-256 checksums of all split files and `labeled_v1.parquet`. Allows anyone to verify data integrity without re-running the pipeline — if the checksums match, the experiments are running on the exact same data. |
+
+#### Labeling Audit Trail (LFS + Git)
+
+| File | Size | Storage | Why it's tracked |
+|------|------|---------|------------------|
+| `data/labeling/llm_labels_raw.jsonl` | 5MB | LFS | Every raw GPT-4o-mini response for Tier 3 labeling. This is the audit trail — it proves what the model was asked, what it returned, and how those responses were mapped to categories. Required for committee review and error analysis. |
+| `data/labeling/coverage_report.json` | 2KB | Git | Summary of how many samples each tier labeled. Shows that Tier 3 LLM was only used where Tiers 1+2 couldn't classify. |
+| `data/labeling/labeling_report.json` | 2KB | Git | Pipeline run summary (timestamps, sample counts, error rates). |
+
+#### Config Exports (Git)
+
+| File | Why it's tracked |
 |------|------------------|
-| `data/raw/` | `uv run loato-bench data download` |
-| `data/embeddings/` | `uv run loato-bench embed run --all` |
-| `results/` | Re-run experiments |
-| `.env` | Copy from `.env.example` |
+| `configs/final_categories.json` | Machine-readable export of taxonomy v1.0 (7 categories, LOATO eligibility flags). Ensures configs and code stay in sync — generated from `taxonomy_spec.py`. |
+
+### What's NOT Tracked and Why
+
+| Path | Why it's gitignored | How to reproduce |
+|------|---------------------|------------------|
+| `data/raw/` | Source datasets are publicly available and large (~200MB+). No reason to duplicate them in the repo. | `uv run loato-bench data download` |
+| `data/embeddings/` | `.npz` caches are deterministic given the same model + dataset. They're also large (hundreds of MB across 5 models). | `uv run loato-bench embed run --all` |
+| `data/labeling/batch_requests.jsonl` | 87MB batch API request file. Too large even for LFS, and fully reproducible from code + `unified_dataset.parquet`. | Re-run labeling pipeline |
+| `data/labeling/batch_id_mapping.json` | OpenAI batch job ID mapping — ephemeral, only useful during the API call. | Re-run labeling pipeline |
+| `results/` | All experiment outputs (trained models, metrics, figures). These are the *results* of the research, regenerated by running experiments. | Re-run experiments |
+| `.env` | Contains `OPENAI_API_KEY` and `WANDB_API_KEY`. Never commit secrets. | Copy `.env.example` and fill in your keys |
 
 ### Attack Taxonomy (v1.0)
 
-7 categories (6 LOATO-eligible), defined in `src/loato_bench/data/taxonomy_spec.py`:
+7 attack categories (6 LOATO-eligible), defined in `src/loato_bench/data/taxonomy_spec.py`. C7 is excluded from LOATO because it's a catch-all — holding out a grab-bag category doesn't test meaningful generalization.
 
-| ID | Category | Mechanism |
-|----|----------|-----------|
-| C1 | Instruction Override | "Ignore previous instructions" |
-| C2 | Jailbreak / Roleplay | Persona adoption to bypass safety |
-| C3 | Obfuscation / Encoding | Base64, ROT13, leetspeak evasion |
-| C4 | Information Extraction | System prompt / training data extraction |
-| C5 | Social Engineering | Emotional manipulation, authority claims |
-| C6 | Context Manipulation | Indirect injection via documents/tools |
-| C7 | Other / Multi-Strategy | Catch-all (not LOATO-eligible) |
+| ID | Category | Mechanism | LOATO |
+|----|----------|-----------|:-----:|
+| C1 | Instruction Override | Directly tells the model to ignore/replace its instructions | Yes |
+| C2 | Jailbreak / Roleplay | Adopts a fictional persona to bypass safety constraints | Yes |
+| C3 | Obfuscation / Encoding | Encodes malicious payload (Base64, ROT13, leetspeak) to evade filters | Yes |
+| C4 | Information Extraction | Attempts to extract system prompts, training data, or secrets | Yes |
+| C5 | Social Engineering | Uses emotional manipulation, urgency, or authority claims | Yes |
+| C6 | Context Manipulation | Injects via external content (documents, tool outputs, hidden text) | Yes |
+| C7 | Other / Multi-Strategy | Catch-all for multi-strategy or unclassifiable attacks | No |
+
+This was consolidated from an earlier 8-category draft: `context_manipulation` (system prompt extraction) merged into C4, `indirect_injection` became C6, and `payload_splitting` (<50 samples) merged into C7. See `OLD_SLUG_TO_NEW` in `taxonomy_spec.py` for the full migration map.
 
 ## Setup
 
@@ -116,21 +172,28 @@ Key data files are committed for reproducibility and audit:
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) package manager
-- [Git LFS](https://git-lfs.com/) for large data files
+- [Git LFS](https://git-lfs.com/) — required for data files (see [Git LFS Setup](#git-lfs-setup) above)
 - Apple Silicon Mac (MPS backend) recommended, CPU works too
 
 ### Installation
 
 ```bash
+# 1. Ensure Git LFS is installed (data files won't download without it)
+git lfs install
+
+# 2. Clone (LFS files download automatically during clone)
 git clone <repo-url>
 cd loato-bench
 
-# Install all dependencies
+# 3. Install Python dependencies
 uv sync
 
-# Copy and fill in API keys
+# 4. Set up API keys
 cp .env.example .env
 # Edit .env with your OPENAI_API_KEY and WANDB_API_KEY
+
+# 5. Verify data integrity (optional — checks SHA-256 hashes)
+cat data/splits/split_manifest.json
 ```
 
 ### Special Installs
@@ -194,39 +257,40 @@ uv run pytest tests/ -v
 ```
 loato-bench/
 ├── pyproject.toml
-├── .gitattributes        # Git LFS tracking rules
+├── .gitattributes          # Git LFS tracking patterns (*.parquet, splits, etc.)
+├── .gitignore              # Broad /data/ ignore + selective negation rules
 ├── Justfile
 ├── configs/
-│   ├── data/             # sources.yaml, taxonomy.yaml
-│   ├── embeddings/       # one YAML per embedding model
-│   ├── classifiers/      # one YAML per classifier
-│   ├── experiments/      # one YAML per experiment protocol
-│   └── final_categories.json  # Taxonomy v1.0 export
+│   ├── data/               # sources.yaml, taxonomy.yaml (Tier 1+2 rules)
+│   ├── embeddings/         # one YAML per embedding model
+│   ├── classifiers/        # one YAML per classifier
+│   ├── experiments/        # one YAML per experiment protocol
+│   └── final_categories.json  # ★ Taxonomy v1.0 export (generated from code)
 ├── src/loato_bench/
-│   ├── cli.py            # Typer CLI entrypoints
-│   ├── data/             # Dataset loaders, harmonization, taxonomy, splits
-│   │   ├── taxonomy_spec.py   # Taxonomy v1.0 (single source of truth)
-│   │   └── llm_labeler.py     # GPT-4o-mini batch labeling
-│   ├── embeddings/       # Embedding model implementations + cache
-│   ├── classifiers/      # Classifier implementations (LogReg, SVM, XGB, MLP)
-│   ├── evaluation/       # LOATO protocol, metrics, transfer, statistical tests
-│   ├── analysis/         # Visualization, SHAP analysis, report generation
-│   ├── tracking/         # W&B integration
-│   └── utils/            # Config loading, device selection, reproducibility
-├── data/                 # Selectively tracked (see Data & Reproducibility above)
-│   ├── processed/        # ★ labeled_v1.parquet, unified_dataset.parquet (LFS)
-│   ├── splits/           # ★ 4 split JSONs + manifest (LFS)
-│   ├── labeling/         # ★ Audit trail (reports + raw labels)
-│   ├── raw/              # (gitignored) source datasets
-│   └── embeddings/       # (gitignored) .npz caches
-├── results/              # (gitignored) models, metrics, figures
-├── docs/                 # EDA guide, taxonomy spec
-├── notebooks/            # EDA, embedding viz, results analysis, SHAP
-├── scripts/              # Setup scripts (e.g., GGUF model download)
-└── tests/                # pytest test suite
+│   ├── cli.py              # Typer CLI entrypoints
+│   ├── data/               # Dataset loaders, harmonization, taxonomy, splits
+│   │   ├── taxonomy_spec.py    # Taxonomy v1.0 — single source of truth for categories
+│   │   └── llm_labeler.py      # GPT-4o-mini batch labeling (Tier 3)
+│   ├── embeddings/         # Embedding model implementations + cache
+│   ├── classifiers/        # Classifier implementations (LogReg, SVM, XGB, MLP)
+│   ├── evaluation/         # LOATO protocol, metrics, transfer, statistical tests
+│   ├── analysis/           # EDA, visualization, SHAP, report generation
+│   ├── tracking/           # W&B integration
+│   └── utils/              # Config loading, device selection, reproducibility
+├── data/                   # Mostly gitignored — only specific files tracked
+│   ├── processed/          # ★ labeled_v1.parquet, unified_dataset.parquet (LFS)
+│   ├── splits/             # ★ 4 split index JSONs + integrity manifest (LFS)
+│   ├── labeling/           # ★ Audit trail: reports + raw LLM outputs (LFS + Git)
+│   ├── raw/                # (gitignored) downloaded source datasets
+│   └── embeddings/         # (gitignored) .npz embedding caches per model
+├── results/                # (gitignored) all experiment outputs
+├── docs/                   # EDA guide, taxonomy spec v1.0
+├── notebooks/              # Interactive analysis (EDA, embeddings, results)
+├── scripts/                # Setup scripts (e.g., GGUF model download)
+└── tests/                  # pytest suite (107+ tests, 90%+ coverage)
 ```
 
-★ = committed to repo (Git LFS for large files)
+★ = committed to repo for reproducibility/audit (large files via Git LFS, see above)
 
 ## Experiment Matrix
 
@@ -254,7 +318,19 @@ loato-bench/
 - **Fallback**: Google Colab / Kaggle free GPU for heavy models (E5-Mistral)
 - **Estimated total compute**: ~2-3 hours for all embeddings + training runs
 
-## Tracking
+## Progress
+
+- [x] **Sprint 0** — Scaffolding: ABCs, CLI, configs, CI pipeline
+- [x] **Sprint 1A** — Data pipeline + EDA: 5 dataset loaders, harmonization, quality gate, taxonomy Tiers 1+2, EDA with docs
+- [x] **Sprint 1B** — Embedding pipeline: 5 models implemented + cached, W&B integration
+- [x] **Sprint 2A** — Taxonomy finalization: Tier 3 LLM labeling (GPT-4o-mini), 7-category v1.0, split generation, data artifacts in Git LFS
+- [ ] **Sprint 2B** — Classifier implementations + training pipeline + hyperparameter sweeps
+- [ ] **Sprint 3** — Core experiments: Standard CV + LOATO evaluation
+- [ ] **Sprint 4A** — Transfer experiments: direct→indirect, cross-lingual, LLM baseline
+- [ ] **Sprint 4B** — Analysis & visualization: UMAP, heatmaps, SHAP, final report
+- [ ] **Sprint 5** — Integration + thesis write-up
+
+## Experiment Tracking
 
 All experiments are logged to [Weights & Biases](https://wandb.ai/). Run naming convention:
 
