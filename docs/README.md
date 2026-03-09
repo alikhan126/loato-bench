@@ -8,6 +8,14 @@ This directory contains comprehensive documentation for the LOATO-Bench (Leave-O
 
 ## 📚 Available Documentation
 
+### [**llm_vulnerability_demo.md**](./llm_vulnerability_demo.md) — LLM Vulnerability Demo Findings
+**Scenario 0: Do LLMs Actually Fall for Prompt Injections?**
+
+Live test results from Claude Sonnet and GPT-4o-mini against direct and RAG-style indirect injection attacks. Both models compromised on 3/5 indirect tests; embedding classifier blocked all 5.
+
+**Status**: Complete
+**Last Updated**: February 19, 2026
+
 ### [**EDA.md**](./eda.md) — Exploratory Data Analysis
 **Sprint 1A: Data Quality Assessment & Taxonomy Validation**
 
