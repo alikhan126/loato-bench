@@ -119,25 +119,26 @@ def harmonize() -> None:
 
 
 @data_app.command()
-def split(
-    apply_filter: bool = typer.Option(True, help="Apply GenTel filtering."),
-    apply_merges: bool = typer.Option(True, help="Merge small taxonomy categories."),
-    apply_tier3: bool = typer.Option(False, help="Run Tier 3 LLM taxonomy mapping."),
-    output_dir: str | None = typer.Option(None, help="Output directory for splits."),
+def label(
+    confidence_threshold: float = typer.Option(0.6, help="Min confidence to apply label."),
+    max_calls: int | None = typer.Option(None, help="Max API calls (None = all)."),
+    dry_run: bool = typer.Option(False, help="Preview only, no API calls."),
+    output_dir: str | None = typer.Option(None, help="Output dir for labeling artifacts."),
+    concurrency: int = typer.Option(8, help="Max concurrent API requests."),
+    model: str | None = typer.Option(None, help="Override model (e.g. gpt-4.1-mini)."),
 ) -> None:
-    """Generate all evaluation splits (standard CV, LOATO, transfer)."""
+    """Label unlabeled injection samples using an OpenAI model."""
+    import json
     from pathlib import Path
 
     import pandas as pd
 
     from loato_bench.data.harmonize import filter_gentel_samples
-    from loato_bench.data.splits import generate_all_splits
-    from loato_bench.data.taxonomy import (
-        apply_taxonomy_mapping,
-        merge_small_categories,
-    )
+    from loato_bench.data.llm_labeler import label_samples, validate_distribution
+    from loato_bench.data.taxonomy import apply_taxonomy_mapping
+    from loato_bench.data.taxonomy_spec import OLD_SLUG_TO_NEW
 
-    console.print("[bold green]Generating splits...[/bold green]")
+    console.print("[bold green]Labeling unlabeled injection samples...[/bold green]")
 
     # 1. Load unified dataset
     parquet_path = DATA_DIR / "processed" / "unified_dataset.parquet"
@@ -148,29 +149,221 @@ def split(
     df = pd.read_parquet(parquet_path)
     console.print(f"  Loaded {len(df):,} samples")
 
-    # 2. Optionally filter GenTel
-    if apply_filter:
-        before = len(df)
-        df = filter_gentel_samples(df)
-        console.print(f"  GenTel filtering: {before:,} → {len(df):,}")
+    # 2. Apply GenTel filtering
+    before = len(df)
+    df = filter_gentel_samples(df)
+    console.print(f"  GenTel filtering: {before:,} -> {len(df):,}")
 
-    # 3. Apply taxonomy mapping (Tier 1+2, optionally Tier 3)
-    df = apply_taxonomy_mapping(df, apply_tier3=apply_tier3)
-    mapped = df["attack_category"].notna().sum()
+    # 3. Apply Tier 1+2 taxonomy mapping
+    df = apply_taxonomy_mapping(df, apply_tier3=False)
     total_inj = (df["label"] == 1).sum()
-    console.print(f"  Taxonomy: {mapped}/{total_inj} injection samples mapped")
+    mapped = df.loc[df["label"] == 1, "attack_category"].notna().sum()
+    console.print(f"  Tier 1+2 mapping: {mapped}/{total_inj} injection samples mapped")
 
-    # 4. Optionally merge small categories
-    if apply_merges:
-        df = merge_small_categories(df)
-        cats = df[df["label"] == 1]["attack_category"].value_counts()
-        console.print(f"  Categories after merge: {cats.to_dict()}")
+    # 4. Migrate old slugs
+    mask = df["attack_category"].notna()
+    df.loc[mask, "attack_category"] = df.loc[mask, "attack_category"].map(
+        lambda x: OLD_SLUG_TO_NEW.get(x, x)
+    )
 
-    # 5. Generate all splits
+    # 5. Run LLM labeling
+    out_path = Path(output_dir) if output_dir else None
+    df = label_samples(
+        df,
+        confidence_threshold=confidence_threshold,
+        max_calls=max_calls,
+        output_dir=out_path,
+        dry_run=dry_run,
+        concurrency=concurrency,
+        model_override=model,
+    )
+
+    # 6. Validate distribution
+    report = validate_distribution(df)
+    if report["warnings"]:
+        for w in report["warnings"]:
+            console.print(f"  [yellow]Warning: {w}[/yellow]")
+    else:
+        console.print("  Distribution check passed.")
+
+    # 7. Save labeled dataset
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    df.to_parquet(labeled_path, index=False)
+    console.print(f"  Saved labeled dataset to {labeled_path}")
+
+    # 8. Save coverage report
+    labeling_dir = Path(output_dir) if output_dir else DATA_DIR / "labeling"
+    labeling_dir.mkdir(parents=True, exist_ok=True)
+    total_inj_final = (df["label"] == 1).sum()
+    labeled_final = df.loc[df["label"] == 1, "attack_category"].notna().sum()
+    coverage_pct = labeled_final / total_inj_final * 100 if total_inj_final > 0 else 0.0
+    uncertain_count = (
+        (df["label_source"] == "uncertain").sum() if "label_source" in df.columns else 0
+    )
+
+    coverage_report = {
+        "total_injection": int(total_inj_final),
+        "labeled": int(labeled_final),
+        "coverage_pct": round(float(coverage_pct), 2),
+        "uncertain_pool": int(uncertain_count),
+        "category_counts": report.get("category_counts", {}),
+    }
+    coverage_path = labeling_dir / "coverage_report.json"
+    with open(coverage_path, "w") as f:
+        json.dump(coverage_report, f, indent=2)
+    console.print(f"  Saved coverage report to {coverage_path}")
+
+    # 9. Summary
+    console.print("\n[bold green]Labeling complete![/bold green]")
+    console.print(f"  Coverage: {labeled_final}/{total_inj_final} ({coverage_pct:.1f}%)")
+    if report["category_counts"]:
+        console.print(f"  LLM labels: {report['category_counts']}")
+
+
+@data_app.command("label-batch")
+def label_batch(
+    model: str = typer.Option("gpt-4o", help="Model for batch labeling."),
+    confidence_threshold: float = typer.Option(0.6, help="Min confidence to apply label."),
+    output_dir: str | None = typer.Option(None, help="Output dir for labeling artifacts."),
+    poll_interval: int = typer.Option(30, help="Seconds between batch status polls."),
+) -> None:
+    """Label unlabeled samples via OpenAI Batch API (cheaper, no rate limits)."""
+    import json
+    from pathlib import Path
+
+    import pandas as pd
+
+    from loato_bench.data.harmonize import filter_gentel_samples
+    from loato_bench.data.llm_labeler import (
+        create_batch_request_file,
+        download_and_apply_batch_results,
+        poll_batch,
+        submit_batch,
+        validate_distribution,
+    )
+    from loato_bench.data.taxonomy import apply_taxonomy_mapping
+    from loato_bench.data.taxonomy_spec import OLD_SLUG_TO_NEW
+
+    console.print(f"[bold green]Batch labeling with {model}...[/bold green]")
+
+    # 1. Load + filter + map (same as `label`)
+    parquet_path = DATA_DIR / "processed" / "unified_dataset.parquet"
+    if not parquet_path.exists():
+        console.print("[red]No processed data. Run 'loato-bench data harmonize' first.[/red]")
+        raise typer.Exit(1)
+
+    df = pd.read_parquet(parquet_path)
+    console.print(f"  Loaded {len(df):,} samples")
+
+    df = filter_gentel_samples(df)
+    df = apply_taxonomy_mapping(df, apply_tier3=False)
+
+    mask = df["attack_category"].notna()
+    df.loc[mask, "attack_category"] = df.loc[mask, "attack_category"].map(
+        lambda x: OLD_SLUG_TO_NEW.get(x, x)
+    )
+
+    # Ensure columns
+    if "label_source" not in df.columns:
+        df["label_source"] = pd.Series(dtype="object")
+    if "confidence" not in df.columns:
+        df["confidence"] = pd.Series(dtype="float64")
+    has_cat = df["attack_category"].notna() & (df["label"] == 1)
+    df.loc[has_cat & df["label_source"].isna(), "label_source"] = "tier1_2"
+
+    out_path = Path(output_dir) if output_dir else DATA_DIR / "labeling"
+
+    # 2. Create batch request file
+    request_path, id_to_idx = create_batch_request_file(df, out_path, model=model)
+    console.print(f"  Created {len(id_to_idx):,} batch requests")
+
+    if not id_to_idx:
+        console.print("[green]All samples already labeled![/green]")
+        return
+
+    # 3. Submit batch
+    batch_id = submit_batch(request_path)
+    console.print(f"  Batch submitted: {batch_id}")
+    console.print(f"  Polling every {poll_interval}s...")
+
+    # 4. Poll until done
+    output_file_id = poll_batch(batch_id, poll_interval=poll_interval)
+    console.print(f"  Batch complete! Output file: {output_file_id}")
+
+    # 5. Download and apply
+    df = download_and_apply_batch_results(
+        output_file_id,
+        df,
+        out_path,
+        confidence_threshold=confidence_threshold,
+        model=model,
+    )
+
+    # 6. Validate + save (same as `label`)
+    report = validate_distribution(df)
+    if report["warnings"]:
+        for w in report["warnings"]:
+            console.print(f"  [yellow]Warning: {w}[/yellow]")
+
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    df.to_parquet(labeled_path, index=False)
+    console.print(f"  Saved to {labeled_path}")
+
+    total_inj = (df["label"] == 1).sum()
+    labeled = df.loc[df["label"] == 1, "attack_category"].notna().sum()
+    coverage_pct = labeled / total_inj * 100 if total_inj > 0 else 0.0
+
+    coverage_report = {
+        "total_injection": int(total_inj),
+        "labeled": int(labeled),
+        "coverage_pct": round(float(coverage_pct), 2),
+        "category_counts": report.get("category_counts", {}),
+        "model": model,
+        "batch_id": batch_id,
+    }
+    coverage_path = out_path / "coverage_report.json"
+    with open(coverage_path, "w") as f:
+        json.dump(coverage_report, f, indent=2)
+
+    console.print(
+        f"\n[bold green]Done! Coverage: {labeled}/{total_inj} ({coverage_pct:.1f}%)[/bold green]"
+    )
+    if report["category_counts"]:
+        console.print(f"  LLM labels: {report['category_counts']}")
+
+
+@data_app.command()
+def split(
+    min_samples: int = typer.Option(150, help="Min samples per category for LOATO."),
+    output_dir: str | None = typer.Option(None, help="Output directory for splits."),
+) -> None:
+    """Generate all evaluation splits from the labeled dataset."""
+    from pathlib import Path
+
+    import pandas as pd
+
+    from loato_bench.data.splits import generate_all_splits
+
+    console.print("[bold green]Generating splits...[/bold green]")
+
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    if not labeled_path.exists():
+        console.print("[red]No labeled data. Run 'loato-bench data label' first.[/red]")
+        raise typer.Exit(1)
+
+    df = pd.read_parquet(labeled_path)
+    console.print(f"  Loaded {len(df):,} samples from labeled_v1.parquet")
+
+    total_inj = (df["label"] == 1).sum()
+    mapped = df.loc[df["label"] == 1, "attack_category"].notna().sum()
+    console.print(f"  Taxonomy coverage: {mapped}/{total_inj} injection samples")
+
+    cats = df[df["label"] == 1]["attack_category"].value_counts()
+    console.print(f"  Categories: {cats.to_dict()}")
+
     out = Path(output_dir) if output_dir else None
-    saved = generate_all_splits(df, output_dir=out)
+    saved = generate_all_splits(df, output_dir=out, min_loato_samples=min_samples)
 
-    # 6. Summary
     console.print(f"\n[bold green]Generated {len(saved)} split files:[/bold green]")
     for name, path in saved.items():
         console.print(f"  {name}: {path}")
