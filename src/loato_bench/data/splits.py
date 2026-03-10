@@ -2,10 +2,15 @@
 
 Generates JSON-serialisable index splits for all four experiment types.
 Each split references rows in the unified DataFrame by integer index.
+
+Parquet output helpers materialise train/test DataFrames into a directory
+structure that can be committed and locked via SHA-256 manifest.
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -30,6 +35,7 @@ def generate_standard_cv_splits(
     n_folds: int = 5,
     stratify_by: list[str] | None = None,
     seed: int = 42,
+    excluded_categories: set[str] | None = None,
 ) -> dict[str, Any]:
     """Generate stratified K-fold CV splits.
 
@@ -44,6 +50,8 @@ def generate_standard_cv_splits(
         are replaced with ``"_unknown"`` so sklearn does not error.
     seed : int
         Random seed.
+    excluded_categories : set[str] | None
+        Attack categories to exclude entirely (e.g. ``{"other"}``).
 
     Returns
     -------
@@ -55,6 +63,12 @@ def generate_standard_cv_splits(
     ValueError
         If the DataFrame is empty or has fewer than *n_folds* samples.
     """
+    if excluded_categories:
+        mask = ~df["attack_category"].isin(excluded_categories)
+        # Keep benign (NaN category) and non-excluded injection
+        benign_mask = df["label"] == 0
+        df = df[benign_mask | mask].reset_index(drop=True)
+
     if df.empty:
         raise ValueError("Cannot generate CV splits from an empty DataFrame")
 
@@ -103,6 +117,7 @@ def generate_loato_splits(
     benign_test_fraction: float = 0.2,
     min_samples: int = 200,
     seed: int = 42,
+    train_only_categories: set[str] | None = None,
 ) -> dict[str, Any]:
     """Generate LOATO splits — one fold per viable attack category.
 
@@ -123,6 +138,9 @@ def generate_loato_splits(
         Minimum injection samples required in a category to create a fold.
     seed : int
         Base random seed.
+    train_only_categories : set[str] | None
+        Categories included in training but never held out as test folds
+        (e.g. ``{"context_manipulation"}`` when below threshold).
 
     Returns
     -------
@@ -137,17 +155,27 @@ def generate_loato_splits(
     if df.empty:
         raise ValueError("Cannot generate LOATO splits from an empty DataFrame")
 
+    if train_only_categories is None:
+        train_only_categories = set()
+
     injection_df = df[df["label"] == 1]
     benign_indices = df[df["label"] == 0].index.tolist()
 
-    # Find viable categories
+    # Find viable categories (meet threshold AND not train-only)
     cat_counts = injection_df["attack_category"].value_counts()
-    viable: list[str] = [str(cat) for cat, count in cat_counts.items() if count >= min_samples]
+    viable: list[str] = [
+        str(cat)
+        for cat, count in cat_counts.items()
+        if count >= min_samples and str(cat) not in train_only_categories
+    ]
 
     if not viable:
         raise ValueError(
             f"No attack category has >= {min_samples} samples. Counts: {cat_counts.to_dict()}"
         )
+
+    # All injection categories present in df (for training pool)
+    all_injection_cats = set(cat_counts.index)
 
     folds = []
     for fold_idx, held_out in enumerate(sorted(viable)):
@@ -158,7 +186,7 @@ def generate_loato_splits(
             injection_df["attack_category"] == held_out
         ].index.tolist()
 
-        # Train injection: all other categories
+        # Train injection: all other categories (including train_only)
         train_injection_idx = injection_df[
             injection_df["attack_category"] != held_out
         ].index.tolist()
@@ -172,7 +200,9 @@ def generate_loato_splits(
         train_indices = sorted(train_injection_idx + benign_train_idx)
         test_indices = sorted(test_injection_idx + benign_test_idx)
 
-        train_categories = sorted(c for c in cat_counts.index if c != held_out and c in viable)
+        train_categories = sorted(
+            c for c in all_injection_cats if c != held_out and isinstance(c, str)
+        )
 
         folds.append(
             {
@@ -318,7 +348,7 @@ def generate_crosslingual_split(
 
 
 # ---------------------------------------------------------------------------
-# Save / Load
+# Save / Load (JSON — index-based)
 # ---------------------------------------------------------------------------
 
 
@@ -358,6 +388,128 @@ def load_splits(path: Path) -> dict[str, Any]:
     with open(path) as f:
         data: dict[str, Any] = json.load(f)
     return data
+
+
+# ---------------------------------------------------------------------------
+# Parquet output helpers
+# ---------------------------------------------------------------------------
+
+
+def compute_file_sha256(path: Path) -> str:
+    """Compute SHA-256 hex digest for a file."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def save_split_parquets(
+    df: pd.DataFrame,
+    splits_dict: dict[str, Any],
+    output_dir: Path,
+    fold_name_fn: Any = None,
+) -> list[Path]:
+    """Materialise index-based splits as train/test parquet pairs.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Source dataset (indices must match those in *splits_dict*).
+    splits_dict : dict[str, Any]
+        Output of ``generate_standard_cv_splits`` or ``generate_loato_splits``.
+    output_dir : Path
+        Root directory for this split type (e.g. ``data/splits/standard_cv``).
+    fold_name_fn : callable | None
+        Function ``(fold_dict) -> str`` returning the fold subdirectory name.
+        Defaults to ``fold_{fold}`` for standard CV.
+
+    Returns
+    -------
+    list[Path]
+        All parquet files written.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+
+    for fold in splits_dict["folds"]:
+        if fold_name_fn is not None:
+            name = fold_name_fn(fold)
+        else:
+            name = f"fold_{fold.get('fold', 0)}"
+
+        fold_dir = output_dir / name
+        fold_dir.mkdir(parents=True, exist_ok=True)
+
+        train_df = df.iloc[fold["train_indices"]].reset_index(drop=True)
+        test_df = df.iloc[fold["test_indices"]].reset_index(drop=True)
+
+        train_path = fold_dir / "train.parquet"
+        test_path = fold_dir / "test.parquet"
+
+        train_df.to_parquet(train_path, index=False, engine="pyarrow")
+        test_df.to_parquet(test_path, index=False, engine="pyarrow")
+
+        written.extend([train_path, test_path])
+
+    return written
+
+
+def write_split_manifest(
+    output_dir: Path,
+    source_path: Path,
+    split_files: list[Path],
+    splits_meta: list[dict[str, Any]],
+    seed: int = 42,
+) -> Path:
+    """Write a comprehensive split manifest with SHA-256 hashes.
+
+    Parameters
+    ----------
+    output_dir : Path
+        Directory to write ``split_manifest.json``.
+    source_path : Path
+        Path to the source parquet (for hash computation).
+    split_files : list[Path]
+        All generated parquet files to hash.
+    splits_meta : list[dict[str, Any]]
+        Metadata entries for each split type / fold.
+    seed : int
+        Random seed used for generation.
+
+    Returns
+    -------
+    Path
+        Path to the written manifest.
+    """
+    source_hash = compute_file_sha256(source_path)
+
+    file_hashes: dict[str, str] = {}
+    for p in split_files:
+        rel = str(p.relative_to(output_dir))
+        file_hashes[rel] = compute_file_sha256(p)
+
+    manifest = {
+        "version": "2.0",
+        "seed": seed,
+        "random_state": seed,
+        "generated_from": source_path.name,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "source_data": {
+            source_path.name: {
+                "sha256": source_hash,
+            }
+        },
+        "splits": splits_meta,
+        "file_hashes": file_hashes,
+    }
+
+    manifest_path = output_dir / "split_manifest.json"
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f, indent=2)
+        f.write("\n")
+
+    return manifest_path
 
 
 # ---------------------------------------------------------------------------
