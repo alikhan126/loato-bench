@@ -369,6 +369,124 @@ def split(
         console.print(f"  {name}: {path}")
 
 
+@data_app.command("review-export")
+def review_export(
+    n_per_category: int = typer.Option(50, help="Samples per category for spot-check."),
+    seed: int = typer.Option(42, help="Random seed."),
+    output_dir: str | None = typer.Option(None, help="Output directory."),
+) -> None:
+    """Export spot-check and uncertain samples for human review."""
+    from pathlib import Path
+
+    import pandas as pd
+
+    from loato_bench.data.review import export_spot_check_samples, export_uncertain_pool
+
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    if not labeled_path.exists():
+        console.print("[red]No labeled data. Run 'loato-bench data label' first.[/red]")
+        raise typer.Exit(1)
+
+    df = pd.read_parquet(labeled_path)
+    console.print(f"  Loaded {len(df):,} samples from labeled_v1.parquet")
+
+    out = Path(output_dir) if output_dir else DATA_DIR / "review"
+    out.mkdir(parents=True, exist_ok=True)
+
+    # Export spot-check samples
+    spot = export_spot_check_samples(df, n_per_category=n_per_category, seed=seed)
+    spot_path = out / "spot_check.csv"
+    spot.to_csv(spot_path, index=False)
+    console.print(f"  Spot-check: {len(spot)} samples → {spot_path}")
+
+    # Export uncertain pool
+    uncertain = export_uncertain_pool(df)
+    uncertain_path = out / "uncertain_pool.csv"
+    uncertain.to_csv(uncertain_path, index=False)
+    console.print(f"  Uncertain: {len(uncertain)} samples → {uncertain_path}")
+
+    console.print(f"\n[bold green]Review exports saved to {out}[/bold green]")
+
+
+@data_app.command("review-apply")
+def review_apply(
+    overrides_path: str | None = typer.Option(None, help="Path to manual_overrides.csv."),
+    spot_check_path: str | None = typer.Option(None, help="Path to completed spot_check.csv."),
+    output_dir: str | None = typer.Option(None, help="Output directory."),
+) -> None:
+    """Apply manual overrides and compute error rates."""
+    import json
+    from pathlib import Path
+
+    import pandas as pd
+
+    from loato_bench.data.review import (
+        apply_manual_overrides,
+        compute_error_rates,
+        generate_coverage_report_v2,
+        load_manual_overrides,
+    )
+
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    if not labeled_path.exists():
+        console.print("[red]No labeled data. Run 'loato-bench data label' first.[/red]")
+        raise typer.Exit(1)
+
+    df = pd.read_parquet(labeled_path)
+    console.print(f"  Loaded {len(df):,} samples from labeled_v1.parquet")
+
+    out = Path(output_dir) if output_dir else DATA_DIR / "review"
+    out.mkdir(parents=True, exist_ok=True)
+
+    # Load and apply overrides
+    override_file = Path(overrides_path) if overrides_path else out / "manual_overrides.csv"
+    if not override_file.exists():
+        console.print(f"[red]Overrides file not found: {override_file}[/red]")
+        raise typer.Exit(1)
+
+    overrides = load_manual_overrides(override_file)
+    console.print(f"  Loaded {len(overrides)} overrides from {override_file}")
+
+    df = apply_manual_overrides(df, overrides)
+    manual_count = (df["label_source"] == "manual").sum()
+    console.print(f"  Applied overrides: {manual_count} rows updated")
+
+    # Save updated parquet
+    updated_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    df.to_parquet(updated_path, index=False)
+    console.print(f"  Saved updated dataset to {updated_path}")
+
+    # Generate coverage report
+    report = generate_coverage_report_v2(df)
+    report_path = out / "coverage_report_v2.json"
+    with open(report_path, "w") as f:
+        json.dump(report, f, indent=2)
+    console.print(f"  Coverage report → {report_path}")
+    cov = report["coverage_pct"]
+    meets = report["meets_90_pct_threshold"]
+    console.print(f"  Coverage: {cov}% (90% threshold: {meets})")
+
+    # Compute error rates if spot-check provided
+    if spot_check_path:
+        sc_path = Path(spot_check_path)
+        if sc_path.exists():
+            sc_df = pd.read_csv(sc_path)
+            errors = compute_error_rates(sc_df)
+            error_json_path = out / "error_rate_report.json"
+            with open(error_json_path, "w") as f:
+                json.dump(errors, f, indent=2)
+            console.print(f"  Error rates → {error_json_path}")
+            if errors["high_error_categories"]:
+                console.print(
+                    f"  [yellow]High error categories (>20%): "
+                    f"{errors['high_error_categories']}[/yellow]"
+                )
+        else:
+            console.print(f"  [yellow]Spot-check file not found: {sc_path}[/yellow]")
+
+    console.print("\n[bold green]Review application complete![/bold green]")
+
+
 # ---------------------------------------------------------------------------
 # embed sub-commands
 # ---------------------------------------------------------------------------
