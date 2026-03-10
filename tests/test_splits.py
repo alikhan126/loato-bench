@@ -153,6 +153,28 @@ class TestGenerateStandardCVSplits:
         with pytest.raises(ValueError, match="empty"):
             splits.generate_standard_cv_splits(df)
 
+    def test_excluded_categories_removes_from_splits(self) -> None:
+        """Excluded categories should be absent from all fold indices."""
+        df = _make_df(categories={"cat1": 300, "cat2": 250, "other": 100})
+        result = splits.generate_standard_cv_splits(df, excluded_categories={"other"})
+        # Reconstruct the filtered df to check
+        benign_mask = df["label"] == 0
+        kept_mask = benign_mask | ~df["attack_category"].isin({"other"})
+        expected_n = kept_mask.sum()
+        all_indices = set()
+        for fold in result["folds"]:
+            all_indices.update(fold["test_indices"])
+        assert len(all_indices) == expected_n
+
+    def test_excluded_categories_preserves_benign(self) -> None:
+        """Benign samples should be kept even when categories are excluded."""
+        df = _make_df(n_benign=50, categories={"cat1": 100, "other": 80})
+        result = splits.generate_standard_cv_splits(df, excluded_categories={"other"})
+        total = sum(len(f["train_indices"]) + len(f["test_indices"]) for f in result["folds"])
+        # 5 folds: each sample appears once in test, 4 times in train → total = 5 * n_samples
+        n_kept = 50 + 100  # benign + cat1
+        assert total == 5 * n_kept
+
 
 # ===========================================================================
 # TestGenerateLoatoSplits
@@ -230,6 +252,37 @@ class TestGenerateLoatoSplits:
         df = _make_df(n_benign=5, categories={"cat1": 10})
         with pytest.raises(ValueError):
             splits.generate_loato_splits(df, min_samples=200)
+
+    def test_train_only_categories_in_train_not_held_out(self) -> None:
+        """Train-only categories appear in training but never as held-out folds."""
+        df = _make_df(categories={"cat1": 300, "cat2": 300, "small_cat": 50})
+        result = splits.generate_loato_splits(
+            df,
+            min_samples=200,
+            train_only_categories={"small_cat"},
+        )
+        # Only cat1 and cat2 should be held out
+        held_out = {f["held_out_category"] for f in result["folds"]}
+        assert held_out == {"cat1", "cat2"}
+
+        # small_cat samples should be in training for every fold
+        for fold in result["folds"]:
+            train_df = df.iloc[fold["train_indices"]]
+            train_cats = set(train_df[train_df["label"] == 1]["attack_category"])
+            assert "small_cat" in train_cats
+
+    def test_train_only_categories_absent_from_test(self) -> None:
+        """Train-only categories should never appear in test injection samples."""
+        df = _make_df(categories={"cat1": 300, "train_only": 100})
+        result = splits.generate_loato_splits(
+            df,
+            min_samples=50,
+            train_only_categories={"train_only"},
+        )
+        for fold in result["folds"]:
+            test_df = df.iloc[fold["test_indices"]]
+            test_injection = test_df[test_df["label"] == 1]
+            assert "train_only" not in test_injection["attack_category"].values
 
 
 # ===========================================================================
@@ -364,6 +417,154 @@ class TestSaveLoadSplits:
         parsed = json.loads(text)
         assert parsed["key"] == "value"
         assert "\n" in text  # indent=2 produces newlines
+
+
+# ===========================================================================
+# TestSaveSplitParquets
+# ===========================================================================
+
+
+class TestSaveSplitParquets:
+    """Tests for save_split_parquets and compute_file_sha256."""
+
+    def test_creates_train_test_parquets(self, tmp_path: Path) -> None:
+        """Parquet files are created for each fold."""
+        df = _make_df(n_benign=20, categories={"cat1": 30})
+        splits_dict = {
+            "experiment": "test",
+            "folds": [
+                {"fold": 0, "train_indices": list(range(40)), "test_indices": list(range(40, 50))},
+            ],
+        }
+        written = splits.save_split_parquets(df, splits_dict, tmp_path)
+        assert len(written) == 2
+        assert (tmp_path / "fold_0" / "train.parquet").exists()
+        assert (tmp_path / "fold_0" / "test.parquet").exists()
+
+    def test_parquet_row_counts_match(self, tmp_path: Path) -> None:
+        """Parquet files have correct number of rows."""
+        df = _make_df(n_benign=20, categories={"cat1": 30})
+        splits_dict = {
+            "experiment": "test",
+            "folds": [
+                {"fold": 0, "train_indices": list(range(40)), "test_indices": list(range(40, 50))},
+            ],
+        }
+        splits.save_split_parquets(df, splits_dict, tmp_path)
+        train_df = pd.read_parquet(tmp_path / "fold_0" / "train.parquet")
+        test_df = pd.read_parquet(tmp_path / "fold_0" / "test.parquet")
+        assert len(train_df) == 40
+        assert len(test_df) == 10
+
+    def test_custom_fold_name_fn(self, tmp_path: Path) -> None:
+        """Custom fold naming function is used."""
+        df = _make_df(n_benign=20, categories={"cat1": 30})
+        splits_dict = {
+            "experiment": "test",
+            "folds": [
+                {
+                    "fold": 0,
+                    "held_out": "cat1",
+                    "train_indices": list(range(20)),
+                    "test_indices": list(range(20, 50)),
+                },
+            ],
+        }
+        splits.save_split_parquets(
+            df, splits_dict, tmp_path, fold_name_fn=lambda f: f"held_{f['held_out']}"
+        )
+        assert (tmp_path / "held_cat1" / "train.parquet").exists()
+
+    def test_multiple_folds(self, tmp_path: Path) -> None:
+        """Multiple folds produce separate directories."""
+        df = _make_df(n_benign=20, categories={"cat1": 30})
+        splits_dict = {
+            "experiment": "test",
+            "folds": [
+                {"fold": 0, "train_indices": list(range(25)), "test_indices": list(range(25, 50))},
+                {"fold": 1, "train_indices": list(range(25, 50)), "test_indices": list(range(25))},
+            ],
+        }
+        written = splits.save_split_parquets(df, splits_dict, tmp_path)
+        assert len(written) == 4
+        assert (tmp_path / "fold_0" / "train.parquet").exists()
+        assert (tmp_path / "fold_1" / "test.parquet").exists()
+
+    def test_compute_file_sha256_deterministic(self, tmp_path: Path) -> None:
+        """SHA-256 is deterministic for the same content."""
+        path = tmp_path / "test.txt"
+        path.write_text("hello world")
+        h1 = splits.compute_file_sha256(path)
+        h2 = splits.compute_file_sha256(path)
+        assert h1 == h2
+        assert len(h1) == 64  # SHA-256 hex digest length
+
+
+# ===========================================================================
+# TestWriteSplitManifest
+# ===========================================================================
+
+
+class TestWriteSplitManifest:
+    """Tests for write_split_manifest."""
+
+    def test_creates_manifest_file(self, tmp_path: Path) -> None:
+        """Manifest JSON is written to output_dir."""
+        source = tmp_path / "source.parquet"
+        source.write_bytes(b"fake parquet data")
+        manifest_path = splits.write_split_manifest(
+            output_dir=tmp_path,
+            source_path=source,
+            split_files=[],
+            splits_meta=[],
+        )
+        assert manifest_path.exists()
+        data = json.loads(manifest_path.read_text())
+        assert data["version"] == "2.0"
+
+    def test_manifest_contains_source_hash(self, tmp_path: Path) -> None:
+        """Manifest includes SHA-256 of source file."""
+        source = tmp_path / "source.parquet"
+        source.write_bytes(b"fake parquet data")
+        manifest_path = splits.write_split_manifest(
+            output_dir=tmp_path,
+            source_path=source,
+            split_files=[],
+            splits_meta=[],
+        )
+        data = json.loads(manifest_path.read_text())
+        assert "sha256" in data["source_data"]["source.parquet"]
+
+    def test_manifest_includes_file_hashes(self, tmp_path: Path) -> None:
+        """Manifest includes SHA-256 of each split file."""
+        source = tmp_path / "source.parquet"
+        source.write_bytes(b"fake parquet data")
+        split_file = tmp_path / "fold_0" / "train.parquet"
+        split_file.parent.mkdir()
+        split_file.write_bytes(b"fake train data")
+
+        manifest_path = splits.write_split_manifest(
+            output_dir=tmp_path,
+            source_path=source,
+            split_files=[split_file],
+            splits_meta=[{"split_type": "cv", "fold_id": 0}],
+        )
+        data = json.loads(manifest_path.read_text())
+        assert "fold_0/train.parquet" in data["file_hashes"]
+
+    def test_manifest_includes_seed(self, tmp_path: Path) -> None:
+        """Manifest records random_state."""
+        source = tmp_path / "source.parquet"
+        source.write_bytes(b"fake parquet data")
+        manifest_path = splits.write_split_manifest(
+            output_dir=tmp_path,
+            source_path=source,
+            split_files=[],
+            splits_meta=[],
+            seed=123,
+        )
+        data = json.loads(manifest_path.read_text())
+        assert data["random_state"] == 123
 
 
 # ===========================================================================

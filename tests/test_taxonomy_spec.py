@@ -76,12 +76,14 @@ class TestTaxonomyV1:
 class TestLoatoCategories:
     """Validate LOATO-eligible category list."""
 
-    def test_has_six_loato_categories(self) -> None:
-        assert len(LOATO_CATEGORIES) == 6
+    def test_has_five_loato_categories(self) -> None:
+        """C1–C5 eligible, C6 below threshold (2A-04), C7 excluded."""
+        assert len(LOATO_CATEGORIES) == 5
 
-    def test_c7_excluded(self) -> None:
-        c7_slug = TAXONOMY_V1["C7"].slug
-        assert c7_slug not in LOATO_CATEGORIES
+    def test_c6_c7_excluded(self) -> None:
+        """C6 (context_manipulation) and C7 (other) are not LOATO-eligible."""
+        assert TAXONOMY_V1["C6"].slug not in LOATO_CATEGORIES
+        assert TAXONOMY_V1["C7"].slug not in LOATO_CATEGORIES
 
     def test_all_loato_slugs_valid(self) -> None:
         for slug in LOATO_CATEGORIES:

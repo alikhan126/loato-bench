@@ -235,7 +235,7 @@ TAXONOMY_V1: dict[str, CategorySpec] = {
         examples_negative=(
             "Ignore your instructions. -> C1 (direct override, not via external content)",
         ),
-        loato_eligible=True,
+        loato_eligible=False,
     ),
     "C7": CategorySpec(
         id="C7",
