@@ -369,6 +369,79 @@ def split(
         console.print(f"  {name}: {path}")
 
 
+@data_app.command("check-contamination")
+def check_contamination(
+    splits_dir: str | None = typer.Option(None, help="Splits directory."),
+    jaccard_threshold: float = typer.Option(0.8, help="Lexical Jaccard threshold."),
+    cosine_threshold: float = typer.Option(0.95, help="Semantic cosine threshold."),
+    k: int = typer.Option(5, help="Nearest neighbors for semantic check."),
+) -> None:
+    """Run lexical + semantic contamination checks on all split pairs."""
+    import json
+    from pathlib import Path
+
+    from loato_bench.data.contamination import check_all_splits
+
+    s_dir = Path(splits_dir) if splits_dir else DATA_DIR / "splits"
+    if not s_dir.exists():
+        console.print(f"[red]Splits directory not found: {s_dir}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[bold green]Running contamination checks on {s_dir}...[/bold green]")
+    report_entries, flags_df = check_all_splits(
+        s_dir,
+        jaccard_threshold=jaccard_threshold,
+        cosine_threshold=cosine_threshold,
+        k=k,
+    )
+
+    if not report_entries:
+        console.print("[red]No split pairs found.[/red]")
+        raise typer.Exit(1)
+
+    # Write outputs
+    from datetime import UTC, datetime
+
+    overall_pass = all(e["pass"] for e in report_entries)
+    report = {
+        "version": "1.0",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "jaccard_threshold": jaccard_threshold,
+        "cosine_threshold": cosine_threshold,
+        "k_neighbors": k,
+        "remediation_threshold_pct": 1.0,
+        "overall_pass": overall_pass,
+        "n_splits_checked": len(report_entries),
+        "splits": report_entries,
+    }
+    report_path = s_dir / "contamination_report.json"
+    with open(report_path, "w") as f:
+        json.dump(report, f, indent=2)
+        f.write("\n")
+
+    flags_path = s_dir / "contamination_flags.csv"
+    flags_df.to_csv(flags_path, index=False)
+
+    # Summary
+    for entry in report_entries:
+        status = "[green]PASS[/green]" if entry["pass"] else "[red]FAIL[/red]"
+        console.print(
+            f"  {entry['split_id']:<25} lex={entry['lexical_flagged']} "
+            f"sem={entry['semantic_flagged']} rate={entry['flagged_rate_pct']:.4f}% {status}"
+        )
+
+    overall = "[green]PASS[/green]" if overall_pass else "[red]FAIL[/red]"
+    console.print(f"\n[bold]Overall: {overall}[/bold]")
+    console.print(f"  Report: {report_path}")
+    console.print(f"  Flags:  {flags_path} ({len(flags_df)} rows)")
+
+    if not overall_pass:
+        console.print(
+            "\n[yellow]Warning: Some splits exceed 1% contamination. "
+            "Re-examine before proceeding to Sprint 2B.[/yellow]"
+        )
+
+
 @data_app.command("review-export")
 def review_export(
     n_per_category: int = typer.Option(50, help="Samples per category for spot-check."),
