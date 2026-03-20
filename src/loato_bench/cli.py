@@ -43,11 +43,15 @@ app.add_typer(analyze_app, name="analyze")
 def download() -> None:
     """Download all raw datasets via HuggingFace."""
     from loato_bench.data import (
+        AlpacaLoader,
         DeepsetLoader,
+        DollyLoader,
         GenTelLoader,
         HackaPromptLoader,
+        OASSTLoader,
         OpenPromptLoader,
         PINTLoader,
+        WildChatLoader,
     )
 
     loaders = [
@@ -56,6 +60,11 @@ def download() -> None:
         ("GenTel-Bench", GenTelLoader(max_samples=10000)),
         ("PINT/Gandalf", PINTLoader()),
         ("Open-Prompt-Injection", OpenPromptLoader()),
+        # Benign augmentation loaders
+        ("Dolly", DollyLoader(max_samples=15000)),
+        ("OASST", OASSTLoader(max_samples=8000)),
+        ("WildChat", WildChatLoader(max_samples=8000)),
+        ("Alpaca", AlpacaLoader(max_samples=8000)),
     ]
 
     raw_dir = DATA_DIR / "raw"
@@ -630,8 +639,25 @@ def train_run(
     classifier: str | None = typer.Option(None, help="Classifier name."),
     experiment: str = typer.Option("standard_cv", help="Experiment type."),
     all_combos: bool = typer.Option(False, "--all", help="Run all combos."),
+    with_ci: bool = typer.Option(False, "--ci", help="Compute bootstrap CIs."),
+    output_dir: str = typer.Option("results/experiments", help="Output directory."),
 ) -> None:
     """Train classifiers on embeddings for a given experiment."""
+    import json
+    from pathlib import Path
+
+    import numpy as np
+    import pandas as pd
+
+    from loato_bench.classifiers import (
+        LogRegClassifier,
+        MLPClassifier,
+        SVMClassifier,
+        XGBoostClassifier,
+    )
+    from loato_bench.embeddings import EmbeddingCache
+    from loato_bench.evaluation.loato import run_experiment
+
     if all_combos:
         pairs = [(e, c) for e in EMBEDDING_MODELS for c in CLASSIFIERS]
     elif embedding and classifier:
@@ -640,11 +666,102 @@ def train_run(
         console.print("[red]Specify --embedding + --classifier, or --all[/red]")
         raise typer.Exit(1)
 
+    # Map experiment → split file
+    split_map = {
+        "standard_cv": DATA_DIR / "splits" / "standard_cv_folds.json",
+        "loato": DATA_DIR / "splits" / "loato_splits.json",
+        "direct_indirect": DATA_DIR / "splits" / "direct_indirect_split.json",
+        "crosslingual": DATA_DIR / "splits" / "crosslingual_split.json",
+    }
+    if experiment not in split_map:
+        console.print(f"[red]Unknown experiment: {experiment}. Choose from {list(split_map)}[/red]")
+        raise typer.Exit(1)
+
+    split_path = split_map[experiment]
+    if not split_path.exists():
+        console.print(f"[red]Split file not found: {split_path}. Run 'data split' first.[/red]")
+        raise typer.Exit(1)
+
+    # Load labels
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    df = pd.read_parquet(labeled_path)
+    labels = df["label"].to_numpy().astype(np.int64)
+
+    # Classifier factory
+    clf_map: dict[str, type] = {
+        "logreg": LogRegClassifier,
+        "svm": SVMClassifier,
+        "xgboost": XGBoostClassifier,
+        "mlp": MLPClassifier,
+    }
+
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
     console.print(f"[bold green]Experiment: {experiment} ({len(pairs)} runs)[/bold green]")
-    for emb, clf in pairs:
-        console.print(f"  {emb} × {clf}")
-        # TODO: Sprint 2B / Sprint 3 — invoke training pipeline
-    console.print("[yellow]Not yet implemented.[/yellow]")
+
+    all_results = []
+    for emb_name, clf_name in pairs:
+        console.print(f"\n[bold]{emb_name} × {clf_name}[/bold]")
+
+        # Load embeddings from cache
+        cache = EmbeddingCache(emb_name)
+        cached = cache.load()
+        if cached is None:
+            console.print(
+                f"  [red]No cached embeddings for {emb_name}. Run 'embed run' first.[/red]"
+            )
+            continue
+        embeddings, _ = cached
+        console.print(f"  [dim]Loaded {embeddings.shape[0]}×{embeddings.shape[1]} embeddings[/dim]")
+
+        if embeddings.shape[0] != len(labels):
+            console.print(
+                f"  [red]Mismatch: {embeddings.shape[0]} embeddings vs {len(labels)} labels[/red]"
+            )
+            continue
+
+        # Create classifier
+        if clf_name not in clf_map:
+            console.print(f"  [red]Unknown classifier: {clf_name}[/red]")
+            continue
+        clf = clf_map[clf_name]()
+
+        # Run experiment
+        result = run_experiment(
+            experiment=experiment,
+            split_path=split_path,
+            embeddings=embeddings,
+            labels=labels,
+            classifier=clf,
+            embedding_name=emb_name,
+            with_ci=with_ci,
+        )
+
+        console.print(
+            f"  [bold green]mean_F1={result.mean_f1:.4f} (±{result.std_f1:.4f})[/bold green]"
+        )
+        for fold in result.folds:
+            held = fold.held_out_category or f"fold_{fold.fold_id}"
+            console.print(
+                f"    {held}: F1={fold.metrics.f1.value:.4f} "
+                f"Acc={fold.metrics.accuracy.value:.4f} "
+                f"AUC={fold.metrics.auc_roc.value:.4f}"
+            )
+
+        all_results.append(result.to_dict())
+
+        # Save individual result
+        result_file = out_path / f"{experiment}_{emb_name}_{clf_name}.json"
+        with open(result_file, "w") as f:
+            json.dump(result.to_dict(), f, indent=2)
+
+    # Save combined results
+    if all_results:
+        combined_file = out_path / f"{experiment}_all_results.json"
+        with open(combined_file, "w") as f:
+            json.dump(all_results, f, indent=2)
+        console.print(f"\n[bold]Results saved to {out_path}/[/bold]")
 
 
 # ---------------------------------------------------------------------------
