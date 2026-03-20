@@ -6,7 +6,7 @@ MS Data Science Capstone — Pace University
 
 ## Overview
 
-LOATO-Bench studies whether embedding-based prompt injection classifiers trained on *known* attack types can detect *unseen* attack categories. The core contribution is a **LOATO (Leave-One-Attack-Type-Out)** evaluation protocol applied to 5 embedding models × 4 classifiers on a unified benchmark of ~20K+ samples from 5 public datasets.
+LOATO-Bench studies whether embedding-based prompt injection classifiers trained on *known* attack types can detect *unseen* attack categories. The core contribution is a **LOATO (Leave-One-Attack-Type-Out)** evaluation protocol applied to 5 embedding models × 4 classifiers on a unified benchmark of ~69K samples from 9 public datasets.
 
 ### Research Questions
 
@@ -23,13 +23,28 @@ LOATO-Bench studies whether embedding-based prompt injection classifiers trained
 
 ### Datasets
 
+The dataset was deliberately balanced (~58% benign / 42% injection) to prevent classifiers from learning a trivial "predict injection always" shortcut. See `docs/datasets.md` for full details on each source.
+
+**Injection Sources (5 datasets):**
+
 | Dataset | Samples | Notes |
 |---------|---------|-------|
-| [Deepset Prompt Injections](https://huggingface.co/datasets/deepset/prompt-injections) | ~662 | Binary labels, simplest source |
-| [HackAPrompt](https://huggingface.co/datasets/hackaprompt/hackaprompt-dataset) | ~5K (filtered) | Successful attacks only, injection-only |
-| [GenTel-Bench](https://huggingface.co/datasets/GenTelLab/gentelbench-v1) | Subset | Quality-gated for genuine injection techniques |
-| [Open-Prompt-Injection](https://github.com/liu00222/Open-Prompt-Injection) | Varies | Indirect injection samples |
-| [PINT / Gandalf](https://huggingface.co/datasets/lakera/gandalf_ignore_instructions) | ~1.3K+ | Multilingual prompt injections |
+| [Open-Prompt-Injection](https://huggingface.co/datasets/guychuk/open-prompt-injection) | ~24K | Indirect injection attacks, largest source |
+| [HackAPrompt](https://huggingface.co/datasets/hackaprompt/hackaprompt-dataset) | ~4.7K | Successful attacks only |
+| [PINT / Gandalf](https://huggingface.co/datasets/lakera/gandalf_ignore_instructions) | ~1K | Password extraction attacks |
+| [Deepset](https://huggingface.co/datasets/deepset/prompt-injections) | ~260 | Mixed benign/injection |
+| GenTel-Bench | — | Currently excluded (stale HF cache) |
+
+**Benign Augmentation Sources (4 datasets):**
+
+| Dataset | Samples | Why chosen |
+|---------|---------|------------|
+| [Dolly 15K](https://huggingface.co/datasets/databricks/databricks-dolly-15k) | ~14.7K | Human-written instructions (diverse tasks) |
+| [Alpaca (cleaned)](https://huggingface.co/datasets/yahma/alpaca-cleaned) | ~8K | Synthetic instructions (GPT-3, diverse) |
+| [OASST1](https://huggingface.co/datasets/OpenAssistant/oasst1) | ~8K | Real human chat prompts (English filtered) |
+| [WildChat](https://huggingface.co/datasets/allenai/WildChat-nontoxic) | ~7.5K | Real ChatGPT sessions (most realistic) |
+
+**Post-harmonization totals:** 68,845 samples (40,017 benign / 28,828 injection)
 
 ### Embedding Models
 
@@ -62,17 +77,18 @@ LOATO-Bench studies whether embedding-based prompt injection classifiers trained
 The benchmark dataset is built from 5 public sources through a multi-stage pipeline:
 
 ```
-5 raw datasets → harmonize (dedup + normalize) → unified_dataset.parquet (32,683 samples)
+9 raw datasets → harmonize (dedup + normalize) → unified_dataset.parquet (68,845 samples)
                                                           ↓
                                               3-tier taxonomy labeling
                                               (source maps → regex → GPT-4o-mini)
+                                              [benign samples skip this step]
                                                           ↓
                                                 labeled_v1.parquet
                                                           ↓
                                               4 experiment split files
 ```
 
-**Harmonization** (Sprint 1A): Each dataset loader produces `UnifiedSample` records. The harmonizer applies NFC unicode normalization, exact deduplication (SHA-256), near-deduplication (MinHash LSH, Jaccard 0.90, word 5-grams), and language detection. GenTel-Bench is quality-gated via heuristic injection confidence scoring (threshold=0.4, capped at 5K samples) because its original categories describe content harm, not injection technique.
+**Harmonization** (Sprint 1A): Each of the 9 dataset loaders produces `UnifiedSample` records. The harmonizer applies NFC unicode normalization, exact deduplication (SHA-256), near-deduplication (MinHash LSH, Jaccard 0.90, word 5-grams), and language detection. This reduces ~80K raw samples to ~69K after cross-source dedup.
 
 **Taxonomy labeling** (Sprint 2A): Samples are assigned to 7 attack categories using a 3-tier system. Tier 1 maps known source-specific labels (e.g., Open-Prompt "jailbreak" → `jailbreak_roleplay`). Tier 2 applies regex patterns for common signals (e.g., "ignore previous" → `instruction_override`). Tier 3 uses GPT-4o-mini via OpenAI's Batch API for samples that Tiers 1+2 couldn't classify (~30% of injections). The raw LLM outputs are preserved as an audit trail.
 
@@ -112,8 +128,8 @@ We commit only the files that are **hard to reproduce** (require API calls, manu
 
 | File | Size | Why it's tracked |
 |------|------|------------------|
-| `data/processed/unified_dataset.parquet` | 6.5MB | The harmonized benchmark before labeling — proves the dedup/filtering pipeline output. Regenerating requires downloading all 5 source datasets and re-running harmonization. |
-| `data/processed/labeled_v1.parquet` | 5.4MB | The final labeled dataset (32,683 samples) that all experiments run on. This is the single artifact that must be identical across all experiment runs for results to be comparable. |
+| `data/processed/unified_dataset.parquet` | ~8MB | The harmonized benchmark before labeling — proves the dedup/filtering pipeline output. Regenerating requires downloading all 9 source datasets and re-running harmonization. |
+| `data/processed/labeled_v1.parquet` | ~8MB | The final labeled dataset (68,845 samples) that all experiments run on. This is the single artifact that must be identical across all experiment runs for results to be comparable. |
 
 #### Splits (LFS)
 
@@ -284,10 +300,10 @@ loato-bench/
 │   ├── raw/                # (gitignored) downloaded source datasets
 │   └── embeddings/         # (gitignored) .npz embedding caches per model
 ├── results/                # (gitignored) all experiment outputs
-├── docs/                   # EDA guide, taxonomy spec v1.0
+├── docs/                   # EDA guide, taxonomy spec, dataset docs, methodology notes
 ├── notebooks/              # Interactive analysis (EDA, embeddings, results)
 ├── scripts/                # Setup scripts (e.g., GGUF model download)
-└── tests/                  # pytest suite (107+ tests, 90%+ coverage)
+└── tests/                  # pytest suite (712 tests, 90%+ coverage)
 ```
 
 ★ = committed to repo for reproducibility/audit (large files via Git LFS, see above)
@@ -312,6 +328,32 @@ loato-bench/
 - Bootstrap 95% confidence intervals (10,000 resamples)
 - McNemar's test, Friedman test + Nemenyi post-hoc for statistical comparisons
 
+## Initial Results (Sprint 2B/3)
+
+Preliminary results from 4 embedding models × 3 classifiers (SVM deferred, E5-Mistral in progress):
+
+| Model × Classifier | Standard CV | LOATO F1 | ΔF1 |
+|---------------------|------------|----------|-----|
+| instructor × MLP | **0.997** | **0.977** | 0.020 |
+| bge_large × MLP | 0.994 | 0.976 | **0.018** |
+| openai_small × MLP | 0.997 | 0.976 | 0.022 |
+| minilm × MLP | 0.992 | 0.963 | 0.029 |
+| instructor × LogReg | 0.995 | 0.967 | 0.028 |
+| openai_small × LogReg | 0.995 | 0.966 | 0.029 |
+| bge_large × LogReg | 0.989 | 0.957 | 0.033 |
+| openai_small × XGBoost | 0.993 | 0.957 | 0.035 |
+| instructor × XGBoost | 0.994 | 0.958 | 0.036 |
+| minilm × XGBoost | 0.983 | 0.931 | 0.052 |
+| bge_large × XGBoost | 0.986 | 0.928 | 0.058 |
+| minilm × LogReg | 0.977 | 0.917 | 0.060 |
+
+**Key findings so far:**
+1. **MLP generalizes best** — smallest ΔF1 across all embeddings (0.018–0.029)
+2. **XGBoost generalizes worst** — largest gaps (0.035–0.058), likely overfitting to category-specific tree splits
+3. **Best overall: instructor × MLP** — highest LOATO F1 (0.977) with tiny 0.020 gap
+4. **Embedding dimension ≠ better generalization** — instructor (768d) beats openai_small (1536d)
+5. **All models achieve >0.91 LOATO F1** — embedding-based classifiers generalize reasonably well to unseen attack types
+
 ## Hardware
 
 - **Primary**: Apple Silicon Mac (18GB RAM, MPS backend)
@@ -324,8 +366,8 @@ loato-bench/
 - [x] **Sprint 1A** — Data pipeline + EDA: 5 dataset loaders, harmonization, quality gate, taxonomy Tiers 1+2, EDA with docs
 - [x] **Sprint 1B** — Embedding pipeline: 5 models implemented + cached, W&B integration
 - [x] **Sprint 2A** — Taxonomy finalization: Tier 3 LLM labeling (GPT-4o-mini), 7-category v1.0, split generation, data artifacts in Git LFS
-- [ ] **Sprint 2B** — Classifier implementations + training pipeline + hyperparameter sweeps
-- [ ] **Sprint 3** — Core experiments: Standard CV + LOATO evaluation
+- [x] **Sprint 2B** — Classifier implementations (LogReg, SVM, XGBoost, MLP) + training pipeline + benign dataset augmentation (4 new sources, 68.8K balanced samples)
+- [x] **Sprint 3** — Core experiments: Standard CV + LOATO evaluation (24/32 runs complete, initial results above)
 - [ ] **Sprint 4A** — Transfer experiments: direct→indirect, cross-lingual, LLM baseline
 - [ ] **Sprint 4B** — Analysis & visualization: UMAP, heatmaps, SHAP, final report
 - [ ] **Sprint 5** — Integration + thesis write-up
