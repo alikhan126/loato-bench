@@ -328,37 +328,41 @@ loato-bench/
 - Bootstrap 95% confidence intervals (10,000 resamples)
 - McNemar's test, Friedman test + Nemenyi post-hoc for statistical comparisons
 
-## Initial Results (Sprint 2B/3)
+## Results (Sprint 3 — Complete)
 
-Preliminary results from 4 embedding models × 3 classifiers (SVM deferred, E5-Mistral in progress):
+5 embedding models × 3 classifiers (SVM deferred — O(n²) on 69K samples), sorted by LOATO F1:
 
 | Model × Classifier | Standard CV | LOATO F1 | ΔF1 |
 |---------------------|------------|----------|-----|
-| instructor × MLP | **0.997** | **0.977** | 0.020 |
+| e5_mistral × MLP | 0.996 | **0.977** | 0.019 |
+| instructor × MLP | **0.997** | 0.977 | 0.020 |
 | bge_large × MLP | 0.994 | 0.976 | **0.018** |
 | openai_small × MLP | 0.997 | 0.976 | 0.022 |
-| minilm × MLP | 0.992 | 0.963 | 0.029 |
 | instructor × LogReg | 0.995 | 0.967 | 0.028 |
 | openai_small × LogReg | 0.995 | 0.966 | 0.029 |
-| bge_large × LogReg | 0.989 | 0.957 | 0.033 |
-| openai_small × XGBoost | 0.993 | 0.957 | 0.035 |
+| e5_mistral × LogReg | 0.994 | 0.964 | 0.030 |
+| minilm × MLP | 0.992 | 0.963 | 0.029 |
 | instructor × XGBoost | 0.994 | 0.958 | 0.036 |
+| openai_small × XGBoost | 0.993 | 0.957 | 0.035 |
+| bge_large × LogReg | 0.989 | 0.956 | 0.033 |
+| e5_mistral × XGBoost | 0.987 | 0.940 | 0.047 |
 | minilm × XGBoost | 0.983 | 0.931 | 0.052 |
-| bge_large × XGBoost | 0.986 | 0.928 | 0.058 |
+| bge_large × XGBoost | 0.986 | 0.927 | 0.058 |
 | minilm × LogReg | 0.977 | 0.917 | 0.060 |
 
-**Key findings so far:**
+**Key findings:**
 1. **MLP generalizes best** — smallest ΔF1 across all embeddings (0.018–0.029)
 2. **XGBoost generalizes worst** — largest gaps (0.035–0.058), likely overfitting to category-specific tree splits
-3. **Best overall: instructor × MLP** — highest LOATO F1 (0.977) with tiny 0.020 gap
-4. **Embedding dimension ≠ better generalization** — instructor (768d) beats openai_small (1536d)
-5. **All models achieve >0.91 LOATO F1** — embedding-based classifiers generalize reasonably well to unseen attack types
+3. **Best overall: e5_mistral × MLP** — highest LOATO F1 (0.977) with ΔF1=0.019
+4. **Top-4 are all MLPs** — the classifier matters more than the embedding for generalization
+5. **Embedding dimension ≠ better generalization** — instructor (768d) ties e5_mistral (4096d)
+6. **All models achieve >0.91 LOATO F1** — embedding-based classifiers generalize well to unseen attack types
 
 ## Hardware
 
-- **Primary**: Apple Silicon Mac (18GB RAM, MPS backend)
-- **Fallback**: Google Colab / Kaggle free GPU for heavy models (E5-Mistral)
-- **Estimated total compute**: ~2-3 hours for all embeddings + training runs
+- **Primary**: Apple Silicon Mac (M3 Pro, 18GB RAM, MPS backend)
+- **E5-Mistral**: ~8 hours for 69K embeddings via llama-cpp-python with Metal (GGUF Q4)
+- **Other models**: Minutes each (sentence-transformers on MPS, OpenAI API)
 
 ## Progress
 
@@ -367,7 +371,7 @@ Preliminary results from 4 embedding models × 3 classifiers (SVM deferred, E5-M
 - [x] **Sprint 1B** — Embedding pipeline: 5 models implemented + cached, W&B integration
 - [x] **Sprint 2A** — Taxonomy finalization: Tier 3 LLM labeling (GPT-4o-mini), 7-category v1.0, split generation, data artifacts in Git LFS
 - [x] **Sprint 2B** — Classifier implementations (LogReg, SVM, XGBoost, MLP) + training pipeline + benign dataset augmentation (4 new sources, 68.8K balanced samples)
-- [x] **Sprint 3** — Core experiments: Standard CV + LOATO evaluation (24/32 runs complete, initial results above)
+- [x] **Sprint 3** — Core experiments: Standard CV + LOATO across all 5 embeddings × 3 classifiers (30 runs complete)
 - [ ] **Sprint 4A** — Transfer experiments: direct→indirect, cross-lingual, LLM baseline
 - [ ] **Sprint 4B** — Analysis & visualization: UMAP, heatmaps, SHAP, final report
 - [ ] **Sprint 5** — Integration + thesis write-up
