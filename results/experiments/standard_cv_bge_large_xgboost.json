@@ -1,0 +1,199 @@
+{
+  "experiment": "standard_cv",
+  "embedding": "bge_large",
+  "classifier": "xgboost",
+  "mean_f1": 0.9855674439824227,
+  "std_f1": 0.00045227587834659156,
+  "folds": [
+    {
+      "fold_id": 0,
+      "held_out_category": null,
+      "train_size": 55076,
+      "test_size": 13769,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9859830053017649,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.979188166494668,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.987510841283608,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9856192021894605,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9986714361813022,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9983550549668284,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 1,
+      "held_out_category": null,
+      "train_size": 55076,
+      "test_size": 13769,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9864913937105091,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9831976442057856,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9845620121422376,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9861271775871034,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9987452067548186,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9984439973374035,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 2,
+      "held_out_category": null,
+      "train_size": 55076,
+      "test_size": 13769,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9863461398794393,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9815262430939227,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.985952133194589,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9859847520942968,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9988008312352865,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9985235855296107,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 3,
+      "held_out_category": null,
+      "train_size": 55076,
+      "test_size": 13769,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9854019899774856,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.981318111053451,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9838709677419355,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9850116554422605,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9987031398085239,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9984598407401079,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 4,
+      "held_out_category": null,
+      "train_size": 55076,
+      "test_size": 13769,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9854746168930205,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9794968986905582,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.985952133194589,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9850944325989923,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9987685202509691,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9984953994580128,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    }
+  ]
+}

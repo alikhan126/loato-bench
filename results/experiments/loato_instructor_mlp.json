@@ -1,0 +1,237 @@
+{
+  "experiment": "loato",
+  "embedding": "instructor",
+  "classifier": "mlp",
+  "mean_f1": 0.9769856398436213,
+  "std_f1": 0.015144897666268402,
+  "folds": [
+    {
+      "fold_id": 0,
+      "held_out_category": "information_extraction",
+      "train_size": 59946,
+      "test_size": 8899,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9940442746375997,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9698996655518395,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9709821428571429,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9835645685876537,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9983778404526874,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9920733742370899,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 1,
+      "held_out_category": "instruction_override",
+      "train_size": 42734,
+      "test_size": 26111,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9961701964689211,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9984499557130204,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9960238568588469,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9955024505624391,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9997693010857618,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9999082000526004,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 2,
+      "held_out_category": "jailbreak_roleplay",
+      "train_size": 60220,
+      "test_size": 8625,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9918840579710145,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9693877551020408,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9163987138263665,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9688923352775087,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9942400016392566,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9744538113259152,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 3,
+      "held_out_category": "obfuscation_encoding",
+      "train_size": 60298,
+      "test_size": 8547,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9886509886509887,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9827213822894169,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.8363970588235294,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9488222833032576,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9985801510095479,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9849766356975328,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 4,
+      "held_out_category": "other",
+      "train_size": 52487,
+      "test_size": 16358,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9884460202958797,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9959912536443148,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9813285457809695,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9884437555093233,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9988057066870419,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9989565918348565,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 5,
+      "held_out_category": "social_engineering",
+      "train_size": 60539,
+      "test_size": 8306,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9966289429328197,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9283489096573209,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9834983498349835,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9766884458215457,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9996560695679715,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9952701912171875,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    }
+  ]
+}

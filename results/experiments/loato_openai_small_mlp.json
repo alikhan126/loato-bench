@@ -1,0 +1,237 @@
+{
+  "experiment": "loato",
+  "embedding": "openai_small",
+  "classifier": "mlp",
+  "mean_f1": 0.9757667087566056,
+  "std_f1": 0.02396113761632824,
+  "folds": [
+    {
+      "fold_id": 0,
+      "held_out_category": "information_extraction",
+      "train_size": 59946,
+      "test_size": 8899,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9961793459939319,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9821029082774049,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9799107142857143,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9894408242805971,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.999778891509434,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9982517243685411,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 1,
+      "held_out_category": "instruction_override",
+      "train_size": 42734,
+      "test_size": 26111,
+      "metrics": {
+        "accuracy": {
+          "value": 0.996936157175137,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9988930706220943,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9966865473823724,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9964014614551056,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9998570056606507,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.9999372500884236,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 2,
+      "held_out_category": "jailbreak_roleplay",
+      "train_size": 60220,
+      "test_size": 8625,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9926956521739131,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9794168096054888,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9180064308681672,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9718956927417571,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9933071721898501,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.975007490853212,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 3,
+      "held_out_category": "obfuscation_encoding",
+      "train_size": 60298,
+      "test_size": 8547,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9838539838539838,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9699074074074074,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.7702205882352942,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9250223505336667,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9952407553049958,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.960037041127757,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 4,
+      "held_out_category": "other",
+      "train_size": 52487,
+      "test_size": 16358,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9901577209927864,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9990255785627283,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9816876122082585,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9901561446687215,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9995097589451234,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.999648091590361,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    },
+    {
+      "fold_id": 5,
+      "held_out_category": "social_engineering",
+      "train_size": 60539,
+      "test_size": 8306,
+      "metrics": {
+        "accuracy": {
+          "value": 0.9973513123043583,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "precision": {
+          "value": 0.9376947040498442,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "recall": {
+          "value": 0.9933993399339934,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "f1": {
+          "value": 0.9816837788597859,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_roc": {
+          "value": 0.9999307190496634,
+          "ci_lower": null,
+          "ci_upper": null
+        },
+        "auc_pr": {
+          "value": 0.998334869372456,
+          "ci_lower": null,
+          "ci_upper": null
+        }
+      }
+    }
+  ]
+}

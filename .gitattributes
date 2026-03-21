@@ -4,3 +4,4 @@
 data/splits/*.json filter=lfs diff=lfs merge=lfs -text
 data/splits/*.csv filter=lfs diff=lfs merge=lfs -text
 data/labeling/llm_labels_raw.jsonl filter=lfs diff=lfs merge=lfs -text
+data/embeddings/**/*.npz filter=lfs diff=lfs merge=lfs -text

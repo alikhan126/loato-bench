@@ -1,0 +1,8 @@
+{
+  "model_name": "openai_small",
+  "model_version": "openai_small",
+  "text_hash": "fde8746009f8123cc7d620f4d41cfe39d348e39650c8bd9c78b2e9e524002c4b",
+  "n_samples": 68845,
+  "dim": 1536,
+  "created_at": "2026-03-19T21:46:32.800611+00:00"
+}

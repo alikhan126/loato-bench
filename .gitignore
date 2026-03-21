@@ -10,8 +10,8 @@ wheels/
 # Virtual environments
 .venv/
 
-# Data & results (large / generated) — only top-level dirs
-/data/
+# Data — ignore everything, then selectively un-ignore
+/data/*
 !/data/processed/
 /data/processed/*
 !/data/processed/labeled_v1.parquet
@@ -26,13 +26,27 @@ wheels/
 /data/review/*
 !/data/review/error_rate_report.csv
 !/data/review/manual_overrides.csv
-/results/
+!/data/embeddings/
+/data/embeddings/*
+!/data/embeddings/minilm/
+!/data/embeddings/bge_large/
+!/data/embeddings/instructor/
+!/data/embeddings/openai_small/
+!/data/embeddings/e5_mistral/
+/data/embeddings/minilm/*
+/data/embeddings/bge_large/*
+/data/embeddings/instructor/*
+/data/embeddings/openai_small/*
+/data/embeddings/e5_mistral/*
+!/data/embeddings/*/embeddings.npz
+!/data/embeddings/*/meta.json
+
+# Results — ignore everything except experiment results
+/results/*
+!/results/experiments/
 
 # Environment secrets
 .env
-
-# Embeddings & caches
-*.npz
 
 # Jupyter
 .ipynb_checkpoints/
