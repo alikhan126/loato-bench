@@ -1111,11 +1111,36 @@ def llm_baseline(
 
 
 @analyze_app.command()
-def report() -> None:
-    """Generate markdown + LaTeX report tables."""
-    console.print("[bold green]Generating report...[/bold green]")
-    # TODO: Sprint 4B
-    console.print("[yellow]Not yet implemented.[/yellow]")
+def report(
+    results_dir: str = typer.Option(
+        "results/experiments",
+        help="Directory containing experiment result JSONs.",
+    ),
+    output_dir: str = typer.Option(
+        "analysis",
+        help="Output directory for tables, figures, and summary.",
+    ),
+    dpi: int = typer.Option(150, help="DPI for saved figures."),
+) -> None:
+    """Generate markdown + LaTeX report tables, heatmaps, and narrative summary."""
+
+    from loato_bench.analysis.report import generate_report
+    from loato_bench.utils.config import PROJECT_ROOT
+
+    res_path = PROJECT_ROOT / results_dir
+    out_path = PROJECT_ROOT / output_dir
+
+    console.print(f"[bold green]Generating report from {res_path}...[/bold green]")
+
+    outputs = generate_report(res_path, out_path, dpi=dpi)
+
+    if not outputs:
+        console.print("[yellow]No results found. Run experiments first.[/yellow]")
+        return
+
+    console.print(f"\n[bold green]Generated {len(outputs)} outputs:[/bold green]")
+    for name, path in outputs.items():
+        console.print(f"  {name}: {path}")
 
 
 # ---------------------------------------------------------------------------
