@@ -14,6 +14,10 @@ from loato_bench.evaluation.metrics import (
     bootstrap_ci,
     compute_metrics,
 )
+from loato_bench.evaluation.transfer import (
+    compute_transfer_gap,
+    run_direct_indirect,
+)
 
 __all__ = [
     "EvalMetrics",
@@ -23,6 +27,8 @@ __all__ = [
     "bootstrap_ci",
     "compute_generalization_gap",
     "compute_metrics",
+    "compute_transfer_gap",
+    "run_direct_indirect",
     "run_experiment",
     "run_loato",
     "run_standard_cv",

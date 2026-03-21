@@ -1,4 +1,4 @@
-"""Tests for evaluation metrics and LOATO protocol."""
+"""Tests for evaluation metrics, LOATO protocol, and transfer experiments."""
 
 import json
 from pathlib import Path
@@ -18,6 +18,10 @@ from loato_bench.evaluation.metrics import (
     MetricResult,
     bootstrap_ci,
     compute_metrics,
+)
+from loato_bench.evaluation.transfer import (
+    compute_transfer_gap,
+    run_direct_indirect,
 )
 
 # ---------------------------------------------------------------------------
@@ -314,3 +318,161 @@ class TestGeneralizationGap:
         loato = ExperimentResult("loato", "emb", "clf", [], mean_f1=0.85, std_f1=0.02)
         gap = compute_generalization_gap(cv, loato)
         assert gap < 0.0
+
+
+# ---------------------------------------------------------------------------
+# Flat split (transfer experiment) tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def flat_split_dir():
+    """Create a temp directory with a flat (no folds) split JSON.
+
+    Simulates direct_indirect_split.json format: top-level
+    train_indices / test_indices without a "folds" key.
+    Labels: [0,1,0,1,0,1,0,1,0,1] — even=benign, odd=injection.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        split = {
+            "experiment": "direct_indirect",
+            "seed": 42,
+            "train_indices": [0, 1, 2, 3, 4, 5],
+            "test_indices": [6, 7, 8, 9],
+        }
+        split_path = Path(tmpdir) / "direct_indirect_split.json"
+        with open(split_path, "w") as f:
+            json.dump(split, f)
+        yield split_path
+
+
+class TestFlatSplitExperiment:
+    """Test that run_experiment handles flat (non-fold) split format."""
+
+    def test_returns_experiment_result(self, flat_split_dir, toy_embeddings):
+        X, y = toy_embeddings
+        clf = LogRegClassifier()
+        result = run_experiment(
+            experiment="direct_indirect",
+            split_path=flat_split_dir,
+            embeddings=X,
+            labels=y,
+            classifier=clf,
+            embedding_name="test_emb",
+        )
+        assert isinstance(result, ExperimentResult)
+
+    def test_single_fold(self, flat_split_dir, toy_embeddings):
+        X, y = toy_embeddings
+        clf = LogRegClassifier()
+        result = run_experiment(
+            experiment="direct_indirect",
+            split_path=flat_split_dir,
+            embeddings=X,
+            labels=y,
+            classifier=clf,
+            embedding_name="test_emb",
+        )
+        assert len(result.folds) == 1
+
+    def test_fold_sizes_match(self, flat_split_dir, toy_embeddings):
+        X, y = toy_embeddings
+        clf = LogRegClassifier()
+        result = run_experiment(
+            experiment="direct_indirect",
+            split_path=flat_split_dir,
+            embeddings=X,
+            labels=y,
+            classifier=clf,
+            embedding_name="test_emb",
+        )
+        assert result.folds[0].train_size == 6
+        assert result.folds[0].test_size == 4
+
+    def test_held_out_category_is_none(self, flat_split_dir, toy_embeddings):
+        X, y = toy_embeddings
+        clf = LogRegClassifier()
+        result = run_experiment(
+            experiment="direct_indirect",
+            split_path=flat_split_dir,
+            embeddings=X,
+            labels=y,
+            classifier=clf,
+            embedding_name="test_emb",
+        )
+        assert result.folds[0].held_out_category is None
+
+    def test_std_f1_zero_single_fold(self, flat_split_dir, toy_embeddings):
+        X, y = toy_embeddings
+        clf = LogRegClassifier()
+        result = run_experiment(
+            experiment="direct_indirect",
+            split_path=flat_split_dir,
+            embeddings=X,
+            labels=y,
+            classifier=clf,
+            embedding_name="test_emb",
+        )
+        assert result.std_f1 == 0.0
+
+    def test_to_dict_serializable(self, flat_split_dir, toy_embeddings):
+        X, y = toy_embeddings
+        clf = LogRegClassifier()
+        result = run_experiment(
+            experiment="direct_indirect",
+            split_path=flat_split_dir,
+            embeddings=X,
+            labels=y,
+            classifier=clf,
+            embedding_name="test_emb",
+        )
+        json.dumps(result.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Transfer wrapper tests
+# ---------------------------------------------------------------------------
+
+
+class TestRunDirectIndirect:
+    """Test the run_direct_indirect convenience wrapper."""
+
+    def test_experiment_name(self, flat_split_dir, toy_embeddings):
+        X, y = toy_embeddings
+        clf = LogRegClassifier()
+        result = run_direct_indirect(
+            split_path=flat_split_dir,
+            embeddings=X,
+            labels=y,
+            classifier=clf,
+            embedding_name="test_emb",
+        )
+        assert result.experiment == "direct_indirect"
+
+    def test_valid_f1(self, flat_split_dir, toy_embeddings):
+        X, y = toy_embeddings
+        clf = LogRegClassifier()
+        result = run_direct_indirect(
+            split_path=flat_split_dir,
+            embeddings=X,
+            labels=y,
+            classifier=clf,
+            embedding_name="test_emb",
+        )
+        assert 0.0 <= result.mean_f1 <= 1.0
+
+
+class TestTransferGap:
+    """Test ΔF1 computation for transfer experiments."""
+
+    def test_positive_gap(self):
+        cv = ExperimentResult("cv", "emb", "clf", [], mean_f1=0.95, std_f1=0.02)
+        transfer = ExperimentResult("direct_indirect", "emb", "clf", [], mean_f1=0.80, std_f1=0.0)
+        gap = compute_transfer_gap(cv, transfer)
+        assert abs(gap - 0.15) < 1e-6
+
+    def test_zero_gap(self):
+        cv = ExperimentResult("cv", "emb", "clf", [], mean_f1=0.90, std_f1=0.02)
+        transfer = ExperimentResult("direct_indirect", "emb", "clf", [], mean_f1=0.90, std_f1=0.0)
+        gap = compute_transfer_gap(cv, transfer)
+        assert abs(gap) < 1e-6
