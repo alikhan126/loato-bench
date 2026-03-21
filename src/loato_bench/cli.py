@@ -640,6 +640,7 @@ def train_run(
     experiment: str = typer.Option("standard_cv", help="Experiment type."),
     all_combos: bool = typer.Option(False, "--all", help="Run all combos."),
     with_ci: bool = typer.Option(False, "--ci", help="Compute bootstrap CIs."),
+    log_wandb: bool = typer.Option(False, "--wandb", help="Log results to W&B."),
     output_dir: str = typer.Option("results/experiments", help="Output directory."),
 ) -> None:
     """Train classifiers on embeddings for a given experiment."""
@@ -750,6 +751,37 @@ def train_run(
             )
 
         all_results.append(result.to_dict())
+
+        # Log to W&B
+        if log_wandb:
+            from loato_bench.tracking.wandb_utils import finish_run, init_run, log_metrics
+
+            # Build tags — add transfer_type for transfer experiments
+            tags = [experiment, emb_name, clf_name]
+            if experiment in ("direct_indirect", "crosslingual"):
+                tags.append(f"transfer_type:{experiment}")
+
+            for fold in result.folds:
+                fold_label = fold.held_out_category or f"fold_{fold.fold_id}"
+                run = init_run(
+                    experiment=experiment,
+                    embedding=emb_name,
+                    classifier=clf_name,
+                    fold=fold_label,
+                    config={
+                        "experiment": experiment,
+                        "embedding": emb_name,
+                        "classifier": clf_name,
+                        "fold": fold_label,
+                        "train_size": fold.train_size,
+                        "test_size": fold.test_size,
+                        "with_ci": with_ci,
+                    },
+                )
+                # Override default tags to include transfer_type
+                run.tags = tuple(tags)
+                log_metrics(run, fold.metrics.summary())
+                finish_run(run)
 
         # Save individual result
         result_file = out_path / f"{experiment}_{emb_name}_{clf_name}.json"

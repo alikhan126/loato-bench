@@ -97,8 +97,24 @@ class ExperimentResult:
 
 
 def _load_split(split_path: Path) -> dict[str, Any]:
-    """Load a split JSON file."""
+    """Load a split JSON file, normalising flat splits to fold format.
+
+    Fold-based splits (standard_cv, loato) have a ``"folds"`` key.
+    Flat splits (direct_indirect, crosslingual) have top-level
+    ``"train_indices"`` / ``"test_indices"`` — these are wrapped into
+    a single-element ``"folds"`` list so callers can iterate uniformly.
+    """
     result: dict[str, Any] = json.load(open(split_path))  # noqa: SIM115
+
+    if "folds" not in result and "train_indices" in result and "test_indices" in result:
+        result["folds"] = [
+            {
+                "train_indices": result["train_indices"],
+                "test_indices": result["test_indices"],
+                "held_out_category": result.get("held_out_category"),
+            }
+        ]
+
     return result
 
 
