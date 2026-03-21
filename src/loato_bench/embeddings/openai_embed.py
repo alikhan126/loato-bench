@@ -30,7 +30,7 @@ class OpenAIEmbedding(EmbeddingModel):
     def dim(self) -> int:
         return self._config.dim
 
-    def encode(self, texts: list[str], batch_size: int = 2048) -> NDArray[np.float32]:
+    def encode(self, texts: list[str], batch_size: int = 256) -> NDArray[np.float32]:
         if not texts:
             return np.zeros((0, self.dim), dtype=np.float32)
 
@@ -47,7 +47,7 @@ class OpenAIEmbedding(EmbeddingModel):
     @retry(
         wait=wait_exponential(min=1, max=60),
         stop=stop_after_attempt(5),
-        retry=retry_if_exception_type(openai.RateLimitError),
+        retry=retry_if_exception_type((openai.RateLimitError, openai.InternalServerError)),
     )
     def _call_api(self, texts: list[str]) -> openai.types.CreateEmbeddingResponse:
         """Call the OpenAI embeddings API with retry logic."""

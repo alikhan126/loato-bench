@@ -6,7 +6,7 @@ MS Data Science Capstone — Pace University
 
 ## Overview
 
-LOATO-Bench studies whether embedding-based prompt injection classifiers trained on *known* attack types can detect *unseen* attack categories. The core contribution is a **LOATO (Leave-One-Attack-Type-Out)** evaluation protocol applied to 5 embedding models × 4 classifiers on a unified benchmark of ~20K+ samples from 5 public datasets.
+LOATO-Bench studies whether embedding-based prompt injection classifiers trained on *known* attack types can detect *unseen* attack categories. The core contribution is a **LOATO (Leave-One-Attack-Type-Out)** evaluation protocol applied to 5 embedding models × 4 classifiers on a unified benchmark of ~69K samples from 9 public datasets.
 
 ### Research Questions
 
@@ -23,13 +23,28 @@ LOATO-Bench studies whether embedding-based prompt injection classifiers trained
 
 ### Datasets
 
+The dataset was deliberately balanced (~58% benign / 42% injection) to prevent classifiers from learning a trivial "predict injection always" shortcut. See `docs/datasets.md` for full details on each source.
+
+**Injection Sources (5 datasets):**
+
 | Dataset | Samples | Notes |
 |---------|---------|-------|
-| [Deepset Prompt Injections](https://huggingface.co/datasets/deepset/prompt-injections) | ~662 | Binary labels, simplest source |
-| [HackAPrompt](https://huggingface.co/datasets/hackaprompt/hackaprompt-dataset) | ~5K (filtered) | Successful attacks only, injection-only |
-| [GenTel-Bench](https://huggingface.co/datasets/GenTelLab/gentelbench-v1) | Subset | Quality-gated for genuine injection techniques |
-| [Open-Prompt-Injection](https://github.com/liu00222/Open-Prompt-Injection) | Varies | Indirect injection samples |
-| [PINT / Gandalf](https://huggingface.co/datasets/lakera/gandalf_ignore_instructions) | ~1.3K+ | Multilingual prompt injections |
+| [Open-Prompt-Injection](https://huggingface.co/datasets/guychuk/open-prompt-injection) | ~24K | Indirect injection attacks, largest source |
+| [HackAPrompt](https://huggingface.co/datasets/hackaprompt/hackaprompt-dataset) | ~4.7K | Successful attacks only |
+| [PINT / Gandalf](https://huggingface.co/datasets/lakera/gandalf_ignore_instructions) | ~1K | Password extraction attacks |
+| [Deepset](https://huggingface.co/datasets/deepset/prompt-injections) | ~260 | Mixed benign/injection |
+| GenTel-Bench | — | Currently excluded (stale HF cache) |
+
+**Benign Augmentation Sources (4 datasets):**
+
+| Dataset | Samples | Why chosen |
+|---------|---------|------------|
+| [Dolly 15K](https://huggingface.co/datasets/databricks/databricks-dolly-15k) | ~14.7K | Human-written instructions (diverse tasks) |
+| [Alpaca (cleaned)](https://huggingface.co/datasets/yahma/alpaca-cleaned) | ~8K | Synthetic instructions (GPT-3, diverse) |
+| [OASST1](https://huggingface.co/datasets/OpenAssistant/oasst1) | ~8K | Real human chat prompts (English filtered) |
+| [WildChat](https://huggingface.co/datasets/allenai/WildChat-nontoxic) | ~7.5K | Real ChatGPT sessions (most realistic) |
+
+**Post-harmonization totals:** 68,845 samples (40,017 benign / 28,828 injection)
 
 ### Embedding Models
 
@@ -62,17 +77,18 @@ LOATO-Bench studies whether embedding-based prompt injection classifiers trained
 The benchmark dataset is built from 5 public sources through a multi-stage pipeline:
 
 ```
-5 raw datasets → harmonize (dedup + normalize) → unified_dataset.parquet (32,683 samples)
+9 raw datasets → harmonize (dedup + normalize) → unified_dataset.parquet (68,845 samples)
                                                           ↓
                                               3-tier taxonomy labeling
                                               (source maps → regex → GPT-4o-mini)
+                                              [benign samples skip this step]
                                                           ↓
                                                 labeled_v1.parquet
                                                           ↓
                                               4 experiment split files
 ```
 
-**Harmonization** (Sprint 1A): Each dataset loader produces `UnifiedSample` records. The harmonizer applies NFC unicode normalization, exact deduplication (SHA-256), near-deduplication (MinHash LSH, Jaccard 0.90, word 5-grams), and language detection. GenTel-Bench is quality-gated via heuristic injection confidence scoring (threshold=0.4, capped at 5K samples) because its original categories describe content harm, not injection technique.
+**Harmonization** (Sprint 1A): Each of the 9 dataset loaders produces `UnifiedSample` records. The harmonizer applies NFC unicode normalization, exact deduplication (SHA-256), near-deduplication (MinHash LSH, Jaccard 0.90, word 5-grams), and language detection. This reduces ~80K raw samples to ~69K after cross-source dedup.
 
 **Taxonomy labeling** (Sprint 2A): Samples are assigned to 7 attack categories using a 3-tier system. Tier 1 maps known source-specific labels (e.g., Open-Prompt "jailbreak" → `jailbreak_roleplay`). Tier 2 applies regex patterns for common signals (e.g., "ignore previous" → `instruction_override`). Tier 3 uses GPT-4o-mini via OpenAI's Batch API for samples that Tiers 1+2 couldn't classify (~30% of injections). The raw LLM outputs are preserved as an audit trail.
 
@@ -80,75 +96,56 @@ The benchmark dataset is built from 5 public sources through a multi-stage pipel
 
 ## Data & Reproducibility
 
-### Why Git LFS?
+### Artifacts on Hugging Face Hub
 
-Several data files (parquet datasets, split indices, labeling outputs) are between 1–7MB each. GitHub rejects files over 100MB and warns above 50MB, and committing multi-megabyte binaries directly bloats the repo's clone size permanently (they can't be garbage-collected from git history). Git LFS replaces these files with lightweight pointers in the repo while storing the actual content on a separate LFS server. This keeps `git clone` fast while still versioning the data.
+Pre-computed embeddings (~2.2 GB), experiment results, dataset files, and splits are hosted on Hugging Face Hub for full reproducibility without re-running the pipeline:
 
-### Git LFS Setup
+**Repo: [alikhan126/loato-bench-artifacts](https://huggingface.co/datasets/alikhan126/loato-bench-artifacts)**
 
-**Git LFS must be installed before cloning**, otherwise you'll get 130-byte pointer files instead of actual data.
-
-```bash
-# Install Git LFS (one-time per machine)
-brew install git-lfs   # macOS
-git lfs install        # configures git hooks
-
-# Then clone normally — LFS files download automatically
-git clone <repo-url>
-```
-
-If you already cloned without LFS, retroactively fetch the real files:
+Download everything with one command:
 
 ```bash
-git lfs install
-git lfs pull
+uv run python scripts/download_artifacts.py
 ```
 
-### What's Tracked and Why
+Or download selectively:
 
-We commit only the files that are **hard to reproduce** (require API calls, manual review, or represent the exact dataset the experiments run on) or that serve as an **audit trail** for the committee. Everything that's cheap to regenerate from code is gitignored.
+```bash
+uv run python scripts/download_artifacts.py --only embeddings  # ~2.2 GB
+uv run python scripts/download_artifacts.py --only results     # experiment JSONs
+uv run python scripts/download_artifacts.py --only data        # parquets + splits
+```
 
-#### Datasets (LFS)
+#### What's on HF Hub
 
-| File | Size | Why it's tracked |
-|------|------|------------------|
-| `data/processed/unified_dataset.parquet` | 6.5MB | The harmonized benchmark before labeling — proves the dedup/filtering pipeline output. Regenerating requires downloading all 5 source datasets and re-running harmonization. |
-| `data/processed/labeled_v1.parquet` | 5.4MB | The final labeled dataset (32,683 samples) that all experiments run on. This is the single artifact that must be identical across all experiment runs for results to be comparable. |
+| Artifact | Size | Contents |
+|----------|------|----------|
+| `embeddings/` | ~2.2 GB | Pre-computed embeddings for all 5 models (`.npz` + metadata) |
+| `results/experiments/` | ~256 KB | 30 experiment result JSONs (5 models × 3 classifiers × 2 protocols) |
+| `data/processed/` | ~16 MB | `labeled_v1.parquet` + `unified_dataset.parquet` |
+| `data/splits/` | ~6 MB | All 4 split index files + manifest |
 
-#### Splits (LFS)
+### What's in Git
 
-| File | Size | Why it's tracked |
-|------|------|------------------|
-| `data/splits/standard_cv_folds.json` | 2.3MB | 5-fold stratified CV indices. Exact fold assignments matter for reproducibility — even with the same seed, library version differences could produce different splits. |
-| `data/splits/loato_splits.json` | 3.3MB | LOATO fold indices (6 folds, one per eligible category). This is the core evaluation protocol — the primary contribution of the thesis. |
-| `data/splits/direct_indirect_split.json` | 340KB | Direct→indirect transfer experiment indices. |
-| `data/splits/crosslingual_split.json` | 341KB | English→non-English transfer experiment indices. |
-| `data/splits/split_manifest.json` | 1KB | SHA-256 checksums of all split files and `labeled_v1.parquet`. Allows anyone to verify data integrity without re-running the pipeline — if the checksums match, the experiments are running on the exact same data. |
+Only small metadata and config files are committed to the repo:
 
-#### Labeling Audit Trail (LFS + Git)
+| File | Purpose |
+|------|---------|
+| `data/labeling/coverage_report.json` | Labeling coverage statistics |
+| `data/labeling/labeling_report.json` | Labeling pipeline summary |
+| `configs/final_categories.json` | Taxonomy v1.0 export (7 categories) |
 
-| File | Size | Storage | Why it's tracked |
-|------|------|---------|------------------|
-| `data/labeling/llm_labels_raw.jsonl` | 5MB | LFS | Every raw GPT-4o-mini response for Tier 3 labeling. This is the audit trail — it proves what the model was asked, what it returned, and how those responses were mapped to categories. Required for committee review and error analysis. |
-| `data/labeling/coverage_report.json` | 2KB | Git | Summary of how many samples each tier labeled. Shows that Tier 3 LLM was only used where Tiers 1+2 couldn't classify. |
-| `data/labeling/labeling_report.json` | 2KB | Git | Pipeline run summary (timestamps, sample counts, error rates). |
+### What's NOT in Git (download from HF Hub)
 
-#### Config Exports (Git)
-
-| File | Why it's tracked |
-|------|------------------|
-| `configs/final_categories.json` | Machine-readable export of taxonomy v1.0 (7 categories, LOATO eligibility flags). Ensures configs and code stay in sync — generated from `taxonomy_spec.py`. |
-
-### What's NOT Tracked and Why
-
-| Path | Why it's gitignored | How to reproduce |
-|------|---------------------|------------------|
-| `data/raw/` | Source datasets are publicly available and large (~200MB+). No reason to duplicate them in the repo. | `uv run loato-bench data download` |
-| `data/embeddings/` | `.npz` caches are deterministic given the same model + dataset. They're also large (hundreds of MB across 5 models). | `uv run loato-bench embed run --all` |
-| `data/labeling/batch_requests.jsonl` | 87MB batch API request file. Too large even for LFS, and fully reproducible from code + `unified_dataset.parquet`. | Re-run labeling pipeline |
-| `data/labeling/batch_id_mapping.json` | OpenAI batch job ID mapping — ephemeral, only useful during the API call. | Re-run labeling pipeline |
-| `results/` | All experiment outputs (trained models, metrics, figures). These are the *results* of the research, regenerated by running experiments. | Re-run experiments |
-| `.env` | Contains `OPENAI_API_KEY` and `WANDB_API_KEY`. Never commit secrets. | Copy `.env.example` and fill in your keys |
+| Artifact | How to get it |
+|----------|---------------|
+| `data/processed/` | `uv run python scripts/download_artifacts.py --only data` |
+| `data/splits/` | `uv run python scripts/download_artifacts.py --only data` |
+| `data/labeling/llm_labels_raw.jsonl` | `uv run python scripts/download_artifacts.py --only data` |
+| `data/embeddings/` | `uv run python scripts/download_artifacts.py --only embeddings` |
+| `results/` | `uv run python scripts/download_artifacts.py --only results` |
+| `data/raw/` | `uv run loato-bench data download` |
+| `.env` | Copy `.env.example` and fill in your keys |
 
 ### Attack Taxonomy (v1.0)
 
@@ -172,28 +169,25 @@ This was consolidated from an earlier 8-category draft: `context_manipulation` (
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) package manager
-- [Git LFS](https://git-lfs.com/) — required for data files (see [Git LFS Setup](#git-lfs-setup) above)
 - Apple Silicon Mac (MPS backend) recommended, CPU works too
 
 ### Installation
 
 ```bash
-# 1. Ensure Git LFS is installed (data files won't download without it)
-git lfs install
-
-# 2. Clone (LFS files download automatically during clone)
+# 1. Clone
 git clone <repo-url>
 cd loato-bench
 
-# 3. Install Python dependencies
+# 2. Install Python dependencies
 uv sync
 
-# 4. Set up API keys
+# 3. Set up environment
 cp .env.example .env
-# Edit .env with your OPENAI_API_KEY and WANDB_API_KEY
+# Edit .env: add HF_TOKEN (required for artifact download)
+#            add OPENAI_API_KEY and WANDB_API_KEY (only if re-running pipelines)
 
-# 5. Verify data integrity (optional — checks SHA-256 hashes)
-cat data/splits/split_manifest.json
+# 4. Download pre-computed artifacts (embeddings, results, data)
+uv run python scripts/download_artifacts.py
 ```
 
 ### Special Installs
@@ -257,8 +251,7 @@ uv run pytest tests/ -v
 ```
 loato-bench/
 ├── pyproject.toml
-├── .gitattributes          # Git LFS tracking patterns (*.parquet, splits, etc.)
-├── .gitignore              # Broad /data/ ignore + selective negation rules
+├── .gitignore              # Data & results gitignored (hosted on HF Hub)
 ├── Justfile
 ├── configs/
 │   ├── data/               # sources.yaml, taxonomy.yaml (Tier 1+2 rules)
@@ -277,20 +270,20 @@ loato-bench/
 │   ├── analysis/           # EDA, visualization, SHAP, report generation
 │   ├── tracking/           # W&B integration
 │   └── utils/              # Config loading, device selection, reproducibility
-├── data/                   # Mostly gitignored — only specific files tracked
-│   ├── processed/          # ★ labeled_v1.parquet, unified_dataset.parquet (LFS)
-│   ├── splits/             # ★ 4 split index JSONs + integrity manifest (LFS)
-│   ├── labeling/           # ★ Audit trail: reports + raw LLM outputs (LFS + Git)
-│   ├── raw/                # (gitignored) downloaded source datasets
-│   └── embeddings/         # (gitignored) .npz embedding caches per model
+├── data/                   # Gitignored — download from HF Hub
+│   ├── processed/          # labeled_v1.parquet, unified_dataset.parquet
+│   ├── splits/             # Split index files + fold parquets
+│   ├── labeling/           # Audit trail: reports + raw LLM outputs
+│   ├── raw/                # Downloaded source datasets
+│   └── embeddings/         # .npz embedding caches per model
 ├── results/                # (gitignored) all experiment outputs
-├── docs/                   # EDA guide, taxonomy spec v1.0
+├── docs/                   # EDA guide, taxonomy spec, dataset docs, methodology notes
 ├── notebooks/              # Interactive analysis (EDA, embeddings, results)
 ├── scripts/                # Setup scripts (e.g., GGUF model download)
-└── tests/                  # pytest suite (107+ tests, 90%+ coverage)
+└── tests/                  # pytest suite (712 tests, 90%+ coverage)
 ```
 
-★ = committed to repo for reproducibility/audit (large files via Git LFS, see above)
+All data files are hosted on [HF Hub](https://huggingface.co/datasets/alikhan126/loato-bench-artifacts) — run `uv run python scripts/download_artifacts.py` to get them.
 
 ## Experiment Matrix
 
@@ -312,20 +305,50 @@ loato-bench/
 - Bootstrap 95% confidence intervals (10,000 resamples)
 - McNemar's test, Friedman test + Nemenyi post-hoc for statistical comparisons
 
+## Results (Sprint 3 — Complete)
+
+5 embedding models × 3 classifiers (SVM deferred — O(n²) on 69K samples), sorted by LOATO F1:
+
+| Model × Classifier | Standard CV | LOATO F1 | ΔF1 |
+|---------------------|------------|----------|-----|
+| e5_mistral × MLP | 0.996 | **0.977** | 0.019 |
+| instructor × MLP | **0.997** | 0.977 | 0.020 |
+| bge_large × MLP | 0.994 | 0.976 | **0.018** |
+| openai_small × MLP | 0.997 | 0.976 | 0.022 |
+| instructor × LogReg | 0.995 | 0.967 | 0.028 |
+| openai_small × LogReg | 0.995 | 0.966 | 0.029 |
+| e5_mistral × LogReg | 0.994 | 0.964 | 0.030 |
+| minilm × MLP | 0.992 | 0.963 | 0.029 |
+| instructor × XGBoost | 0.994 | 0.958 | 0.036 |
+| openai_small × XGBoost | 0.993 | 0.957 | 0.035 |
+| bge_large × LogReg | 0.989 | 0.956 | 0.033 |
+| e5_mistral × XGBoost | 0.987 | 0.940 | 0.047 |
+| minilm × XGBoost | 0.983 | 0.931 | 0.052 |
+| bge_large × XGBoost | 0.986 | 0.927 | 0.058 |
+| minilm × LogReg | 0.977 | 0.917 | 0.060 |
+
+**Key findings:**
+1. **MLP generalizes best** — smallest ΔF1 across all embeddings (0.018–0.029)
+2. **XGBoost generalizes worst** — largest gaps (0.035–0.058), likely overfitting to category-specific tree splits
+3. **Best overall: e5_mistral × MLP** — highest LOATO F1 (0.977) with ΔF1=0.019
+4. **Top-4 are all MLPs** — the classifier matters more than the embedding for generalization
+5. **Embedding dimension ≠ better generalization** — instructor (768d) ties e5_mistral (4096d)
+6. **All models achieve >0.91 LOATO F1** — embedding-based classifiers generalize well to unseen attack types
+
 ## Hardware
 
-- **Primary**: Apple Silicon Mac (18GB RAM, MPS backend)
-- **Fallback**: Google Colab / Kaggle free GPU for heavy models (E5-Mistral)
-- **Estimated total compute**: ~2-3 hours for all embeddings + training runs
+- **Primary**: Apple Silicon Mac (M3 Pro, 18GB RAM, MPS backend)
+- **E5-Mistral**: ~8 hours for 69K embeddings via llama-cpp-python with Metal (GGUF Q4)
+- **Other models**: Minutes each (sentence-transformers on MPS, OpenAI API)
 
 ## Progress
 
 - [x] **Sprint 0** — Scaffolding: ABCs, CLI, configs, CI pipeline
 - [x] **Sprint 1A** — Data pipeline + EDA: 5 dataset loaders, harmonization, quality gate, taxonomy Tiers 1+2, EDA with docs
 - [x] **Sprint 1B** — Embedding pipeline: 5 models implemented + cached, W&B integration
-- [x] **Sprint 2A** — Taxonomy finalization: Tier 3 LLM labeling (GPT-4o-mini), 7-category v1.0, split generation, data artifacts in Git LFS
-- [ ] **Sprint 2B** — Classifier implementations + training pipeline + hyperparameter sweeps
-- [ ] **Sprint 3** — Core experiments: Standard CV + LOATO evaluation
+- [x] **Sprint 2A** — Taxonomy finalization: Tier 3 LLM labeling (GPT-4o-mini), 7-category v1.0, split generation, data artifacts on HF Hub
+- [x] **Sprint 2B** — Classifier implementations (LogReg, SVM, XGBoost, MLP) + training pipeline + benign dataset augmentation (4 new sources, 68.8K balanced samples)
+- [x] **Sprint 3** — Core experiments: Standard CV + LOATO across all 5 embeddings × 3 classifiers (30 runs complete)
 - [ ] **Sprint 4A** — Transfer experiments: direct→indirect, cross-lingual, LLM baseline
 - [ ] **Sprint 4B** — Analysis & visualization: UMAP, heatmaps, SHAP, final report
 - [ ] **Sprint 5** — Integration + thesis write-up
