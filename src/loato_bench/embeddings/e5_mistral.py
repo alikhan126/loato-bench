@@ -70,7 +70,9 @@ class E5MistralEmbedding(EmbeddingModel):
         for i, text in enumerate(texts):
             formatted = template.format(text=text)
             result = self._model.embed(formatted)
-            # With pooling_type=3 (last-token), embed() returns a flat list[float]
+            # With pooling_type=3, embed() may return [[float, ...]] — unwrap if needed
+            if isinstance(result[0], list):
+                result = result[0]
             embeddings.append(result)
 
             if (i + 1) % log_interval == 0 or (i + 1) == total:
