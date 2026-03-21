@@ -962,12 +962,152 @@ def features(
 
 @analyze_app.command("llm-baseline")
 def llm_baseline(
-    samples: int = typer.Option(500, help="Number of samples to evaluate."),
+    samples: int = typer.Option(500, help="Number of samples to evaluate per test pool."),
+    model: str = typer.Option("gpt-4o", help="OpenAI model identifier."),
+    test_pool: str = typer.Option(
+        "both",
+        help="Test pool: 'standard_cv', 'direct_indirect', or 'both'.",
+    ),
+    concurrency: int = typer.Option(8, help="Max concurrent API requests."),
+    log_wandb: bool = typer.Option(False, "--wandb", help="Log results to W&B."),
+    output_dir: str = typer.Option("results/llm_baseline", help="Output directory for results."),
+    seed: int = typer.Option(42, help="Random seed for stratified sampling."),
 ) -> None:
-    """Run LLM zero-shot baseline evaluation."""
-    console.print(f"[bold green]Running LLM baseline on {samples} samples...[/bold green]")
-    # TODO: Sprint 4A
-    console.print("[yellow]Not yet implemented.[/yellow]")
+    """Run LLM zero-shot baseline evaluation on test samples."""
+    import json
+    from pathlib import Path
+
+    import numpy as np
+    import pandas as pd
+
+    from loato_bench.evaluation.llm_baseline import (
+        draw_stratified_sample,
+        run_llm_baseline,
+    )
+
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    # Load dataset
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    if not labeled_path.exists():
+        console.print(f"[red]Dataset not found: {labeled_path}[/red]")
+        raise typer.Exit(1)
+    df = pd.read_parquet(labeled_path)
+
+    # Determine which test pools to evaluate
+    pools: list[str] = []
+    if test_pool in ("standard_cv", "both"):
+        pools.append("standard_cv")
+    if test_pool in ("direct_indirect", "both"):
+        pools.append("direct_indirect")
+    if not pools:
+        console.print(f"[red]Unknown test pool: {test_pool}[/red]")
+        raise typer.Exit(1)
+
+    split_map = {
+        "standard_cv": DATA_DIR / "splits" / "standard_cv_folds.json",
+        "direct_indirect": DATA_DIR / "splits" / "direct_indirect_split.json",
+    }
+
+    all_results: list[dict] = []
+
+    for pool_name in pools:
+        split_path = split_map[pool_name]
+        if not split_path.exists():
+            console.print(f"[red]Split file not found: {split_path}[/red]")
+            continue
+
+        with open(split_path) as f:
+            split_data = json.load(f)
+
+        # Extract test indices
+        if "folds" in split_data:
+            # Standard CV: union of all fold test sets
+            test_indices: list[int] = []
+            seen: set[int] = set()
+            for fold in split_data["folds"]:
+                for idx in fold["test_indices"]:
+                    if idx not in seen:
+                        test_indices.append(idx)
+                        seen.add(idx)
+        else:
+            test_indices = split_data["test_indices"]
+
+        console.print(f"\n[bold]{pool_name}[/bold]: {len(test_indices)} test samples available")
+
+        # Stratified subsample
+        sampled_indices = draw_stratified_sample(df, test_indices, n_samples=samples, seed=seed)
+        console.print(f"  Sampled {len(sampled_indices)} samples (seed={seed})")
+
+        # Extract texts and labels
+        texts = df.iloc[sampled_indices]["text"].tolist()
+        y_true = df.iloc[sampled_indices]["label"].to_numpy().astype(np.int64)
+
+        benign_count = int((y_true == 0).sum())
+        inject_count = int((y_true == 1).sum())
+        console.print(f"  Distribution: {benign_count} benign, {inject_count} injection")
+
+        # Run evaluation
+        log_path = out_path / f"llm_baseline_{pool_name}_{model.replace('-', '_')}.jsonl"
+        console.print(f"  [bold green]Evaluating with {model}...[/bold green]")
+
+        result = run_llm_baseline(
+            texts,
+            y_true,
+            model=model,
+            concurrency=concurrency,
+            test_pool=pool_name,
+            log_path=log_path,
+        )
+
+        # Display results
+        m = result.metrics.summary()
+        console.print(f"  [bold green]Results ({pool_name}):[/bold green]")
+        console.print(
+            f"    F1={m['f1']:.4f}  Acc={m['accuracy']:.4f}  "
+            f"Prec={m['precision']:.4f}  Rec={m['recall']:.4f}"
+        )
+        console.print(f"    AUC-ROC={m['auc_roc']:.4f}  AUC-PR={m['auc_pr']:.4f}")
+        console.print(
+            f"    Cost: {result.cost.total_tokens} tokens, ~${result.cost.estimated_cost_usd:.4f}"
+        )
+
+        # Save result JSON
+        result_file = out_path / f"llm_baseline_{pool_name}_{model.replace('-', '_')}.json"
+        with open(result_file, "w") as f:
+            json.dump(result.to_dict(), f, indent=2)
+        console.print(f"  Saved to {result_file}")
+
+        all_results.append(result.to_dict())
+
+        # Log to W&B
+        if log_wandb:
+            from loato_bench.tracking.wandb_utils import finish_run, init_run, log_metrics
+
+            run = init_run(
+                experiment="llm_baseline",
+                embedding="none",
+                classifier=model,
+                fold=pool_name,
+                config={
+                    "model": model,
+                    "test_pool": pool_name,
+                    "n_samples": result.n_samples,
+                    "cost_usd": result.cost.estimated_cost_usd,
+                    "total_tokens": result.cost.total_tokens,
+                },
+            )
+            run.tags = ("llm_baseline", model, pool_name)
+            log_metrics(run, m)
+            finish_run(run)
+
+    # Save combined results
+    if all_results:
+        combined_file = out_path / f"llm_baseline_{model.replace('-', '_')}_all.json"
+        with open(combined_file, "w") as f:
+            json.dump(all_results, f, indent=2)
+        console.print(f"\n[bold green]All results saved to {combined_file}[/bold green]")
 
 
 @analyze_app.command()

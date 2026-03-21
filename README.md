@@ -70,7 +70,8 @@ The dataset was deliberately balanced (~58% benign / 42% injection) to prevent c
 | **Standard 5-Fold CV** | Stratified by label + attack category |
 | **LOATO** | Train on K-1 attack types, test on held-out type |
 | **Direct → Indirect** | Train on direct injections, test on indirect |
-| **Cross-lingual** | Train on English, test on non-English |
+
+> **Note:** Cross-lingual evaluation (train English → test non-English) was considered but deemed out of scope — only ~777 non-English samples exist across 30+ languages, with no single language reaching the 300-sample minimum for statistical validity. This data gap is documented as a limitation and future work direction.
 
 ## Data Pipeline
 
@@ -292,10 +293,9 @@ All data files are hosted on [HF Hub](https://huggingface.co/datasets/alikhan126
 | Standard 5-Fold CV | 5 | 4 | 5 | 100 |
 | LOATO | 5 | 4 | 6-8 | 120-160 |
 | Direct → Indirect | 5 | 4 | 1 | 20 |
-| Cross-lingual | 5 | 4 | 1 | 20 |
 | Feature Analysis (SHAP) | 5 | 1 | 1 | 5 |
 | LLM Baseline | 2 | — | 1 | 2 |
-| **Total** | | | | **~270-310** |
+| **Total** | | | | **~250-290** |
 
 ## Key Metrics
 
@@ -349,7 +349,7 @@ All data files are hosted on [HF Hub](https://huggingface.co/datasets/alikhan126
 - [x] **Sprint 2A** — Taxonomy finalization: Tier 3 LLM labeling (GPT-4o-mini), 7-category v1.0, split generation, data artifacts on HF Hub
 - [x] **Sprint 2B** — Classifier implementations (LogReg, SVM, XGBoost, MLP) + training pipeline + benign dataset augmentation (4 new sources, 68.8K balanced samples)
 - [x] **Sprint 3** — Core experiments: Standard CV + LOATO across all 5 embeddings × 3 classifiers (30 runs complete)
-- [ ] **Sprint 4A** — Transfer experiments: direct→indirect, cross-lingual, LLM baseline
+- [ ] **Sprint 4A** — Transfer experiments: direct→indirect, SVM (with PCA), LLM baseline
 - [ ] **Sprint 4B** — Analysis & visualization: UMAP, heatmaps, SHAP, final report
 - [ ] **Sprint 5** — Integration + thesis write-up
 

@@ -45,7 +45,7 @@ Fomin reports 7–37% detection rates for indirect injections on production guar
 
 - **Deployment risk**: A classifier scoring 0.97 F1 on standard CV may score 0.21 on indirect injections — a deployment-critical blind spot
 - **Threshold recalibration**: High AUC with low F1 suggests post-hoc threshold tuning could help
-- **LLM baseline needed**: If GPT-4o scores 0.85+ on indirect injections (LOATO-4A-02), it confirms the gap is architectural, not data-driven
+- **LLM baseline confirms architectural gap**: GPT-4o scores 0.71 F1 on indirect injections (LOATO-4A-03) vs the best embedding classifier at 0.41 — a +0.30 F1 advantage. The generalization failure is architectural (pattern matching vs reasoning), not data-driven. See `docs/findings_llm_baseline.md`
 
 ## Artifacts
 
