@@ -77,27 +77,21 @@ def download_artifacts(only: str | None = None) -> None:
                 copied += 1
             print(f"  results/experiments/ ({len(list(src.glob('*.json')))} files)")
 
-    # Copy data files (parquets + splits)
+    # Copy all data files (processed, splits, labeling)
     if only in (None, "data"):
-        # Parquets
-        src = local_path / "data" / "processed"
+        src = local_path / "data"
         if src.exists():
-            dst = PROJECT_ROOT / "data" / "processed"
-            dst.mkdir(parents=True, exist_ok=True)
-            for f in src.glob("*.parquet"):
-                shutil.copy2(f, dst / f.name)
-                copied += 1
-                print(f"  data/processed/{f.name}")
-
-        # Splits
-        src = local_path / "data" / "splits"
-        if src.exists():
-            dst = PROJECT_ROOT / "data" / "splits"
-            dst.mkdir(parents=True, exist_ok=True)
-            for f in src.glob("*.json"):
-                shutil.copy2(f, dst / f.name)
-                copied += 1
-            print(f"  data/splits/ ({len(list(src.glob('*.json')))} files)")
+            dst = PROJECT_ROOT / "data"
+            for root, _dirs, files in os.walk(src):
+                root_path = Path(root)
+                rel = root_path.relative_to(src)
+                target_dir = dst / rel
+                target_dir.mkdir(parents=True, exist_ok=True)
+                for fname in sorted(files):
+                    shutil.copy2(root_path / fname, target_dir / fname)
+                    copied += 1
+                if files:
+                    print(f"  data/{rel}/ ({len(files)} files)")
 
     # Clean up cache
     shutil.rmtree(cache_dir, ignore_errors=True)
