@@ -24,6 +24,14 @@ Results from 15 experiments (5 embeddings × 3 classifiers) training on direct i
 **Status**: Complete
 **Last Updated**: March 21, 2026
 
+### [**findings_llm_baseline.md**](./findings_llm_baseline.md) — LLM Zero-Shot Baseline Findings
+**Sprint 4A: LOATO-4A-03 LLM Baseline**
+
+GPT-4o zero-shot evaluation on 500 samples from Standard CV and Direct→Indirect test pools. GPT-4o scores 0.85 F1 on standard tests (below trained classifiers) but 0.71 F1 on indirect injections (+0.30 over best embedding classifier), confirming the generalization gap is architectural.
+
+**Status**: Complete
+**Last Updated**: March 21, 2026
+
 ### [**related_work_fomin.md**](./related_work_fomin.md) — Fomin (2026) Positioning
 Positioning against Fomin's LODO paper (arXiv:2602.14161). Includes citation, Related Work paragraph draft, sharpened contributions list, and differentiators table.
 

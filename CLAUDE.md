@@ -165,7 +165,7 @@ LogReg, SVM (RBF, probability=True), XGBoost, MLP (2-layer, sklearn MLPClassifie
 | standard_cv      | Stratified 5-fold CV                                    | 100   |
 | loato            | Leave-one-attack-type-out (primary contribution)        | 120-160 |
 | direct_indirect  | Train direct only → test indirect                       | 20    |
-| crosslingual     | Train English only → test non-English                   | 20    |
+| ~~crosslingual~~ | ~~Train English only → test non-English~~ (out of scope — <300 samples per language) | — |
 
 ## Metrics
 
@@ -179,9 +179,9 @@ Stats: bootstrap 95% CIs (10K resamples), McNemar, Friedman + Nemenyi, Cohen's d
 - [x] Sprint 1A: Data pipeline + EDA (5/5 loaders, harmonization, quality gate, taxonomy Tier 1+2, EDA complete with docs)
 - [x] Sprint 1B: Embedding pipeline (5 models, cache, W&B utils) — all implemented + tested
 - [x] Sprint 2A: Taxonomy finalization (Tier 3 LLM labeling, 7-category v1.0) + split generation + data artifacts tracked in Git LFS
-- [ ] Sprint 2B: Classifier implementations + training pipeline + sweeps
-- [ ] Sprint 3: Core experiments (Standard CV + LOATO)
-- [ ] Sprint 4A: Transfer experiments (direct→indirect, cross-lingual, LLM baseline)
+- [x] Sprint 2B: Classifier implementations + training pipeline + balanced dataset (68.8K samples)
+- [x] Sprint 3: Core experiments (Standard CV + LOATO) — 5 embeddings × 3 classifiers (30 runs)
+- [ ] Sprint 4A: Transfer experiments (direct→indirect), SVM (with PCA), LLM baseline
 - [ ] Sprint 4B: Analysis & visualization (UMAP, heatmaps, SHAP, report)
 - [ ] Sprint 5: Integration + write-up
 
