@@ -45,6 +45,7 @@ class E5MistralEmbedding(EmbeddingModel):
             model_path=model_path,
             embedding=True,
             n_gpu_layers=-1,
+            pooling_type=3,  # Last-token pooling (E5-Mistral convention)
             verbose=False,
         )
 
@@ -69,8 +70,8 @@ class E5MistralEmbedding(EmbeddingModel):
         for i, text in enumerate(texts):
             formatted = template.format(text=text)
             result = self._model.embed(formatted)
-            # llama-cpp returns list of lists; take the first (and only) embedding
-            embeddings.append(result[0])
+            # With pooling_type=3 (last-token), embed() returns a flat list[float]
+            embeddings.append(result)
 
             if (i + 1) % log_interval == 0 or (i + 1) == total:
                 elapsed = time.time() - start
