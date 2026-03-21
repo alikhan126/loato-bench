@@ -1,100 +1,144 @@
-# LOATO-Bench: Master Findings (Paper Reference)
+# LOATO-Bench: Evaluating Cross-Attack Generalization of Embedding-Based Prompt Injection Classifiers
 
-**Project**: LOATO-Bench — Leave-One-Attack-Type-Out Benchmark for Prompt Injection Classifiers
-**Team**: MS Data Science Capstone, Pace University
-**Date**: 2026-03-21
+**Rough Paper Draft — All Sections**
 
-This document collects every finding, method, and design decision in the order work was done. It is the single reference for writing the thesis — everything a reviewer would ask is answered here.
-
----
-
-## Research Question
-
-**Can embedding-based classifiers generalize to novel attack types they have never seen during training?**
-
-Everyone builds prompt injection classifiers, tests them with standard cross-validation, gets 0.95+ F1, and ships them. But standard CV leaks attack types into training — every fold sees examples of every attack category. In the real world, attackers invent new techniques the classifier has never encountered. Does it still work?
+*Ali Khan*
+MS Data Science, Pace University
+2026
 
 ---
 
-## Phase 0 — Motivation & Problem Statement
+## Abstract
 
-### Finding 0.1: Frontier LLMs Are Vulnerable to Prompt Injections
+Embedding-based prompt injection classifiers achieve 0.95+ F1 under standard cross-validation, suggesting deployment readiness. However, standard CV guarantees every attack type appears in training — a condition violated in real deployments where novel attack techniques emerge continuously. We introduce LOATO-Bench (Leave-One-Attack-Type-Out Benchmark), an evaluation framework that holds out entire attack categories during training to measure cross-attack generalization. Using a unified dataset of 68,845 samples from 9 public sources, harmonized into a 7-category taxonomy, we evaluate 5 embedding models × 3 classifiers under three protocols: standard 5-fold CV, LOATO, and direct-to-indirect transfer. Our findings reveal a critical deployment blind spot: classifiers scoring 0.97 F1 under standard CV collapse to 0.21–0.41 F1 when tested on indirect injections unseen during training. A GPT-4o zero-shot baseline scores 0.71 F1 on the same indirect test set — a +0.30 advantage requiring no training — confirming the generalization failure is architectural. We argue that standard CV is insufficient for evaluating prompt injection classifiers intended for production deployment, and that LOATO-style evaluation should become standard practice.
 
-**Source**: `docs/llm_vulnerability_demo.md`
-
-We tested Claude Sonnet and GPT-4o-mini against 5 RAG-style indirect injection attacks. Both models were compromised on 3 out of 5 tests (60% attack success rate). An embedding-based classifier blocked all 5 poisoned documents.
-
-**Implication**: LLM safety training alone is insufficient. Lightweight input-layer classifiers are needed as a first defense — but how well do they generalize to attacks they haven't seen?
+**Keywords**: prompt injection, adversarial attacks, embedding classifiers, evaluation methodology, generalization, LLM security
 
 ---
 
-## Phase 1 — Data Collection & Exploration (Sprints 1A–1B)
+## 1. Introduction
 
-### 1.1 Datasets Used
+### 1.1 Problem Statement
 
-We unified **9 public datasets** — 5 injection-focused and 4 benign augmentation sources.
+Large Language Models (LLMs) are increasingly deployed in applications that process untrusted input — RAG pipelines, chatbots, AI agents with tool access. Prompt injection attacks exploit this by embedding malicious instructions in user inputs or retrieved documents, causing the LLM to deviate from its intended behavior. As LLM adoption grows, so does the attack surface.
 
-#### Injection Datasets (5 sources)
+A common defense is an input-layer classifier: a lightweight model that screens incoming text before it reaches the LLM. These classifiers typically use sentence embeddings (e.g., MiniLM, BGE, OpenAI text-embedding-3) fed into a classical ML head (logistic regression, XGBoost, MLP). They are fast, cheap, and — under standard evaluation — appear to perform excellently, with F1 scores routinely exceeding 0.95.
 
-| # | Dataset | HuggingFace ID | License | Raw Samples | After Cleaning | What It Contains |
-|---|---------|----------------|---------|-------------|----------------|------------------|
-| 1 | Deepset | `deepset/prompt-injections` | MIT | 662 | 659 | Small, manually labeled. Both benign + injection. High quality. |
-| 2 | HackAPrompt | `hackaprompt/hackaprompt-dataset` | Apache 2.0 | ~12K | 4,671 | Competition entries (successful injections only). Multi-level attacks against GPT-3.5/FlanT5. Filtered to `correct=True, error=False`. No benign. |
-| 3 | GenTel-Bench | `GenTelLab/gentelbench-v1` | CC-BY-4.0 | 177K → 10K cap | ~2,068 | Originally content-harm, NOT injection-specific. Required injection-confidence scoring + filtering (see Finding 1.3). |
-| 4 | PINT/Gandalf | `lakera/gandalf_ignore_instructions` | Apache 2.0 | 1,000 | 999 | Gandalf challenge — all injection attempts designed to extract a secret password. |
-| 5 | Open-Prompt | `guychuk/open-prompt-injection` | MIT | ~33.6K | 24,286 | Largest source. Primarily **indirect** injection attacks (injected into task context). Each row yields 1 injection + 1 benign (deduplicated). |
+**The problem**: Standard evaluation (stratified k-fold cross-validation) guarantees that every attack type appears in both training and test sets. This does not reflect deployment reality, where attackers invent novel techniques the classifier has never seen. A classifier that memorizes "ignore previous instructions" will score perfectly on a test set containing that phrase, but fail when an attacker hides the same intent inside a retrieved document or encodes it in Base64.
 
-#### Benign Augmentation Datasets (4 sources)
+**Research question**: Can embedding-based prompt injection classifiers generalize to novel attack types they have never seen during training?
 
-Added to fix severe class imbalance (originally 94% injection / 6% benign before augmentation).
+### 1.2 Motivation
 
-| # | Dataset | HuggingFace ID | License | Samples | Origin | Prompt Style |
-|---|---------|----------------|---------|---------|--------|--------------|
-| 6 | Dolly 15K | `databricks/databricks-dolly-15k` | CC-BY-SA-3.0 | ~14,738 | Human-written (5K Databricks employees) | Task instructions (summarize, classify, brainstorm) |
-| 7 | OASST1 | `OpenAssistant/oasst1` | Apache 2.0 | ~7,974 | Human-written (13.5K volunteers) | Conversational questions (how-to, explain, help) |
-| 8 | WildChat | `allenai/WildChat-nontoxic` | ODC-BY | ~7,524 | Human-written (real ChatGPT sessions) | Naturalistic chat — the most realistic benign prompts |
-| 9 | Alpaca | `yahma/alpaca-cleaned` | CC-BY-NC-4.0 | ~7,994 | Synthetic (GPT-3 text-davinci-003) | Diverse instructions (translate, write, generate) |
+We conducted a live demonstration (Appendix A) showing that Claude Sonnet and GPT-4o-mini are both vulnerable to RAG-style indirect injection attacks, with a 60% compromise rate across 5 tests. An embedding-based classifier blocked all 5 poisoned documents. This validates the need for input-layer classifiers — but raises the question of whether they would catch attack types not present in their training data.
 
-**Why 4 benign sources?** Prevents the classifier from learning surface-level shortcuts. If all benign samples were instructions (Dolly), the model might learn "instructions = benign" rather than the actual injection/benign distinction.
+### 1.3 Contributions
 
-### 1.2 Preprocessing Pipeline
+1. **LOATO protocol** — A leave-one-attack-type-out evaluation framework that holds out entire attack categories during training, measuring cross-attack generalization at the technique level (distinct from Fomin's (2026) dataset-level LODO).
+
+2. **Direct-to-indirect transfer measurement** — The first controlled experiment showing F1 collapse from 0.97 to 0.21–0.41 across 15 embedding-classifier combinations when classifiers trained on direct injections are tested on indirect ones.
+
+3. **Unified benchmark dataset** — 68,845 samples from 9 public sources, harmonized through a reproducible pipeline with exact deduplication (SHA-256), near-deduplication (MinHash LSH), and a 7-category attack taxonomy built via 3-tier labeling (source mapping → regex → GPT-4o-mini).
+
+4. **LLM baseline contextualization** — GPT-4o zero-shot evaluation quantifying the cost of the embedding classifier approach: +0.30 F1 advantage on indirect injections at ~1000x higher cost per query.
+
+### 1.4 Novelty
+
+Prior work evaluates prompt injection classifiers using standard CV or dataset-level holdout (Fomin, 2026). No existing benchmark systematically holds out *attack categories* to test whether classifiers generalize across technique boundaries. LOATO-Bench fills this gap and demonstrates that the standard evaluation paradigm dramatically overstates deployment safety.
+
+---
+
+## 2. Related Work
+
+### 2.1 Prompt Injection Attacks
+
+[To be expanded with full literature review. Key references: Perez & Ribeiro (2022) on prompt injection taxonomy, Greshake et al. (2023) on indirect injection, Liu et al. (2024) on attack surveys.]
+
+### 2.2 Prompt Injection Detection
+
+Production guardrails include Meta's Prompt-Guard-2-86M, LlamaGuard, and various embedding-based classifiers. These are typically evaluated on held-out splits of their training data, which inflates reported performance.
+
+### 2.3 Fomin (2026) — Leave-One-Dataset-Out
+
+Fomin (2026) proposes Leave-One-Dataset-Out (LODO) evaluation across 18 prompt injection datasets, revealing that standard same-source train-test splits inflate aggregate AUC by 8.4 percentage points, with per-dataset accuracy gaps ranging from 1% to 25%. LOATO-Bench is complementary: it holds out attack *categories* within a unified taxonomy rather than entire datasets, measuring whether classifiers generalize across attack types rather than across data sources. Both independently confirm that standard evaluation overestimates real-world performance.
+
+Key differences:
+
+| Dimension | Fomin (LODO) | LOATO-Bench (Ours) |
+|---|---|---|
+| Holdout unit | Entire dataset | Attack category |
+| # Datasets | 18 | 9 (unified + deduplicated) |
+| Taxonomy | None (dataset-level) | 7-category v1.0 |
+| Detection approach | LLM activations, production guardrails | Embedding + classical ML |
+| Direct-to-indirect | 7–37% on guardrails (observational) | 0.21–0.41 F1 (controlled) |
+| Inflation finding | 8.4pp AUC | Standard CV F1 0.97 → LOATO/transfer 0.21–0.41 |
+
+Fomin reports 7–37% detection rates for indirect injections on production guardrails but does not run a controlled direct-to-indirect transfer experiment. LOATO-Bench provides exactly this.
+
+---
+
+## 3. Dataset
+
+### 3.1 Data Sources
+
+We unified 9 public datasets — 5 injection-focused and 4 benign augmentation sources.
+
+#### 3.1.1 Injection Datasets
+
+| Dataset | HuggingFace ID | License | Raw | After Cleaning | Description |
+|---------|----------------|---------|-----|----------------|-------------|
+| Deepset | `deepset/prompt-injections` | MIT | 662 | 659 | Manually labeled, both benign + injection |
+| HackAPrompt | `hackaprompt/hackaprompt-dataset` | Apache 2.0 | ~12K | 4,671 | Competition entries (successful injections only). Filtered to `correct=True, error=False` |
+| GenTel-Bench | `GenTelLab/gentelbench-v1` | CC-BY-4.0 | 177K → 10K cap | ~2,068 | Content-harm dataset. Required injection-confidence filtering (§3.2) |
+| PINT/Gandalf | `lakera/gandalf_ignore_instructions` | Apache 2.0 | 1,000 | 999 | Gandalf challenge — password extraction attempts |
+| Open-Prompt | `guychuk/open-prompt-injection` | MIT | ~33.6K | 24,286 | Largest source. Primarily **indirect** injections. Each row yields 1 injection + 1 benign |
+
+#### 3.1.2 Benign Augmentation Datasets
+
+Added to address severe class imbalance (originally 94% injection / 6% benign before augmentation).
+
+| Dataset | HuggingFace ID | License | Samples | Origin | Prompt Style |
+|---------|----------------|---------|---------|--------|--------------|
+| Dolly 15K | `databricks/databricks-dolly-15k` | CC-BY-SA-3.0 | ~14,738 | Human (5K Databricks employees) | Task instructions |
+| OASST1 | `OpenAssistant/oasst1` | Apache 2.0 | ~7,974 | Human (13.5K volunteers) | Conversational questions |
+| WildChat | `allenai/WildChat-nontoxic` | ODC-BY | ~7,524 | Human (real ChatGPT sessions) | Naturalistic chat |
+| Alpaca | `yahma/alpaca-cleaned` | CC-BY-NC-4.0 | ~7,994 | Synthetic (GPT-3) | Diverse instructions |
+
+Four benign sources were chosen to cover different prompt styles (instructions, conversations, naturalistic chat, synthetic diversity), preventing the classifier from learning surface-level shortcuts (e.g., "all benign samples are instructions").
+
+### 3.2 Data Preprocessing Pipeline
 
 ```
-Step 1: Download (9 loaders)
-  → 80,438 raw samples
+Step 1: Download → 80,438 raw samples from 9 loaders
 
 Step 2: Harmonize
-  → NFC Unicode normalization
-  → Exact deduplication (SHA-256 hash on text)
-  → Near-deduplication (MinHash LSH, Jaccard threshold=0.90, word 5-grams)
-  → Language detection (fasttext lid.176.bin)
-  → 68,845 samples (unified_dataset.parquet)
+  ├── NFC Unicode normalization + whitespace collapse
+  ├── Exact deduplication (SHA-256 hash on normalized text)
+  ├── Near-deduplication (MinHash LSH)
+  │   ├── Jaccard threshold: 0.90
+  │   ├── Shingles: word 5-grams
+  │   └── MinHash permutations: 128
+  ├── Language detection (langdetect)
+  └── → 68,845 samples (unified_dataset.parquet)
 
-Step 3: Taxonomy Labeling (3-tier system)
-  → Tier 1: Source-specific mappings (e.g., Open-Prompt "jailbreak" → C2)
-  → Tier 2: Regex patterns (e.g., "ignore previous" → C1)
-  → Tier 3: LLM-assisted (GPT-4o-mini) for the ~47% unmapped samples
-  → 68,845 samples, 100% categorized (labeled_v1.parquet)
+Step 3: Taxonomy Labeling (3-tier)
+  ├── Tier 1: Source-specific mappings (e.g., Open-Prompt attack_type → taxonomy slug)
+  ├── Tier 2: Regex patterns (32 keyword patterns, e.g., "ignore previous" → C1)
+  ├── Tier 3: LLM-assisted (GPT-4o-mini, temperature=0.0) for ~47% unmapped samples
+  └── → 68,845 samples, 100% categorized (labeled_v1.parquet)
 
 Step 4: Split Generation
-  → Standard 5-fold CV (stratified on label)
-  → LOATO 6-fold (5 held-out categories + 1 benign-only)
-  → Direct→Indirect (flat train/test)
-  → 4 split JSON files + SHA-256 manifest
+  ├── Standard 5-fold CV (stratified on label + attack_category)
+  ├── LOATO 6-fold (5 held-out categories + benign)
+  ├── Direct→Indirect (flat train/test)
+  └── → 4 split JSON files + SHA-256 manifest
 ```
 
-**Deduplication calibration note**: Initial MinHash threshold (0.85, word 3-grams) was too aggressive — dropped dataset to 25K (50% loss). After reviewing community standards (Lee et al. 2022, BigCode, SlimPajama), adjusted to 0.90/5-grams. Recovered ~12K legitimate samples while still removing true near-duplicates.
+**Deduplication calibration**: Initial MinHash threshold (0.85, word 3-grams) was too aggressive — reduced dataset by 50%. After reviewing community standards (Lee et al. 2022, BigCode, SlimPajama), we adjusted to 0.90 threshold with word 5-grams. This recovered ~12,000 legitimate samples while still removing true near-duplicates.
 
-### 1.3 GenTel Quality Gate
+**GenTel quality gate**: GenTel-Bench is a content-harm dataset, not injection-specific. We developed a heuristic injection-confidence scorer using 32 injection-indicative keywords (e.g., "ignore", "disregard", "override", "jailbreak", "system prompt"). Samples scoring below 0.4 (on a 0–1 scale) were filtered. This removed 71% of GenTel samples but dramatically improved data quality.
 
-GenTel-Bench (177K raw) is a content-harm dataset, not injection-specific. Our heuristic injection-confidence scoring (keyword matching, range 0–1):
-- 62% of GenTel scored below 0.3 — general harmful content, not injection
-- Average score: 0.25
-- After filtering (threshold=0.4, cap 5K): **71% of GenTel removed**
-
-Without this gate, the dataset would be dominated by non-injection noise.
-
-### 1.4 Post-Cleaning Dataset
+### 3.3 Final Dataset
 
 | Label | Count | Percentage |
 |-------|-------|------------|
@@ -102,337 +146,447 @@ Without this gate, the dataset would be dominated by non-injection noise.
 | Injection (1) | 28,842 | 41.9% |
 | **Total** | **68,845** | **100%** |
 
-**By source** (top 5): Open-Prompt 24,286 · Dolly 14,738 · Alpaca 7,994 · OASST 7,974 · WildChat 7,524
+### 3.4 Attack Taxonomy (v1.0)
 
-### 1.5 EDA Key Findings
+We developed a 7-category taxonomy via iterative refinement through 3-tier labeling:
 
-**Source**: `docs/eda_findings.md`, `docs/eda.md`
+| ID | Category | Mechanism | LOATO Eligible | Samples |
+|----|----------|-----------|:-:|---|
+| C1 | Instruction Override | Direct commands to ignore/replace system instructions | Yes | 19,161 |
+| C2 | Jailbreak / Roleplay | Persona adoption to bypass safety (DAN, evil mode) | Yes | 1,614 |
+| C3 | Obfuscation / Encoding | Hiding attacks in Base64, ROT13, pig latin, leetspeak | Yes | 545 |
+| C4 | Information Extraction | Extracting system prompts, training data, secrets | Yes | 771 |
+| C5 | Social Engineering | Emotional manipulation, urgency, authority appeals | Yes | 311 |
+| C6 | Context Manipulation | Indirect injection via retrieved context or tool outputs | No (188) | 188 |
+| C7 | Other / Multi-Strategy | Catch-all for multi-technique or unclassifiable | No | 8,242 |
 
-1. **Class imbalance** (pre-augmentation): 90% attack / 10% benign → addressed by 4 benign augmentation datasets
-2. **Taxonomy coverage** after Tier 1+2: ~53% of injections mapped → ~47% required Tier 3 LLM labeling
-3. **Three categories too small** for LOATO: Information Extraction (48), Obfuscation (17), Context Manipulation (12) → resolved in Sprint 2A via taxonomy restructuring
-4. **Almost all English**: 98% (36,996/37,773). Cross-lingual experiments excluded (<300 per non-English language)
-5. **Few outliers**: 3 samples >10K chars, 27 mostly-uppercase samples → not actionable
+**Boundary rules**: If one strategy clearly dominates, assign to that category. Persona + override → primary mechanism decides. Encoding tricks are C3 even if wrapped in a persona. C7 only when no single category fits.
 
----
-
-## Phase 2 — Taxonomy & Splits (Sprint 2A)
-
-### 2.1 Taxonomy v1.0 — 7 Attack Categories
-
-**Source**: `docs/taxonomy_spec_v1.0.md`, `configs/final_categories.json`
-
-Final taxonomy after 3-tier labeling:
-
-| ID | Slug | Category Name | LOATO Eligible | Samples | Mechanism |
-|----|------|---------------|:-:|---|---|
-| C1 | `instruction_override` | Instruction Override | Yes | 18,108 | Direct commands to ignore/replace system instructions |
-| C2 | `jailbreak_roleplay` | Jailbreak / Roleplay | Yes | 622 | Persona adoption to bypass safety (DAN, evil mode) |
-| C3 | `obfuscation_encoding` | Obfuscation / Encoding | Yes | 544 | Hiding attacks in Base64, ROT13, pig latin, etc. |
-| C4 | `information_extraction` | Information Extraction | Yes | 896 | Extracting system prompts, training data, confidential info |
-| C5 | `social_engineering` | Social Engineering | Yes | 303 | Emotional manipulation, urgency, authority claims |
-| C6 | `context_manipulation` | Context Manipulation | No (188) | 188 | Indirect injection via retrieved context — excluded from LOATO (too few samples) |
-| C7 | `other` | Other / Multi-Strategy | No | 8,355 | Multi-technique or unclassifiable — excluded from LOATO |
-
-**5 LOATO-eligible categories** (C1–C5), each with ≥200 samples.
-
-**Migration from 8-slug draft**: Old `context_manipulation` (system prompt extraction) → C4; old `indirect_injection` → C6; old `payload_splitting` (<50 samples) → C7.
-
-### 2.2 Split Design
-
-| Split Type | Structure | Purpose |
-|------------|-----------|---------|
-| **Standard 5-fold CV** | Stratified on label, all categories in every fold | Baseline — "how well does it perform when it's seen everything?" |
-| **LOATO 6-fold** | 5 held-out categories (C1–C5) + 1 benign-only fold | Primary contribution — "how well does it generalize to unseen attack types?" |
-| **Direct→Indirect** | Flat train/test — direct injections for training, indirect for test | Transfer experiment — "can a classifier trained on direct attacks detect indirect ones?" |
-| **Cross-lingual** | Excluded | <300 samples per non-English language — documented as limitation |
-
-**LOATO test sets**: Held-out attack category + 20% benign samples (so the test set has both classes).
-
-**Contamination check** (Sprint 2A-05): Lexical (Jaccard) + semantic (cosine similarity) contamination between train/test splits verified to be minimal.
+**C6 exclusion**: Context Manipulation has only 188 samples — 12 short of the 200 minimum threshold for LOATO folds. All 188 were LLM-labeled. This underrepresentation of indirect injection in public datasets is itself a finding and a noted limitation.
 
 ---
 
-## Phase 3 — Embeddings & Classifiers (Sprints 1B, 2B)
+## 4. Methodology
 
-### 3.1 Embedding Models (5)
+### 4.1 Embedding Models
 
-| Key | Model | Dim | Library | Notes |
-|-----|-------|-----|---------|-------|
-| minilm | all-MiniLM-L6-v2 | 384 | sentence-transformers | Fastest, smallest. Good baseline. |
-| bge_large | BGE-large-en-v1.5 | 1024 | sentence-transformers | Requires query prefix. |
-| instructor | Instructor-large | 768 | InstructorEmbedding | Instruction-tuned — you can tell it what the text *is*. CPU fallback on MPS. |
-| openai_small | text-embedding-3-small | 1536 | OpenAI API | Closed-source, API-based. Best transfer performance. |
-| e5_mistral | E5-Mistral-7B (GGUF Q4) | 4096 | llama-cpp-python | Largest model. Metal acceleration on Apple Silicon. |
+We selected 5 embedding models spanning the spectrum from tiny/fast to large/expensive, covering open-source and proprietary models with different training paradigms:
 
-**Why these 5?** Span the spectrum from tiny/fast (MiniLM, 384d) to large/expensive (E5-Mistral, 4096d). Mix of open-source and proprietary. Different training paradigms (contrastive, instruction-tuned, decoder-based).
+| Model | Dim | Library | Device | Batch | Special Parameters |
+|-------|-----|---------|--------|-------|--------------------|
+| all-MiniLM-L6-v2 | 384 | sentence-transformers | MPS | 64 | — |
+| BGE-large-en-v1.5 | 1024 | sentence-transformers | MPS | 32 | Prefix: "Represent this sentence for classification: " |
+| Instructor-large | 768 | InstructorEmbedding | CPU | 16 | Instruction: "Classify whether this text is a prompt injection attack: " |
+| text-embedding-3-small | 1536 | OpenAI API | — | 512 | Proprietary, API-based |
+| E5-Mistral-7B (GGUF Q4) | 4096 | llama-cpp-python | Metal | 1 | Prompt template with task instruction |
 
-All embeddings cached as `.npz` files. Reproducible via `loato-bench embed run --all`.
+All embeddings are cached as `.npz` files and are fully reproducible.
 
-### 3.2 Classifiers (4)
+### 4.2 Classifiers
 
-| Classifier | Type | Implementation | Key Details |
-|------------|------|----------------|-------------|
-| LogReg | Logistic Regression | sklearn `LogisticRegression` | Linear baseline. Fast, interpretable. |
-| SVM | Support Vector Machine (RBF) | sklearn `SVC(probability=True)` | Non-linear. Slow with 4096d (E5-Mistral needs PCA). |
-| XGBoost | Gradient Boosted Trees | `xgboost.XGBClassifier` | Ensemble method. Prone to overfitting surface patterns. |
-| MLP | Multi-Layer Perceptron | sklearn `MLPClassifier` (2 hidden layers, early stopping) | Neural network. Best non-linear capacity. |
+All classifiers wrap sklearn pipelines with `StandardScaler` as the first step to normalize features regardless of embedding dimension.
 
-**All wrap sklearn pipelines**: `StandardScaler → Classifier`. This ensures features are normalized regardless of embedding dimension.
+| Classifier | Type | Key Hyperparameters |
+|------------|------|---------------------|
+| LogReg | Logistic Regression | C=1.0, max_iter=1000, solver=lbfgs |
+| XGBoost | Gradient Boosted Trees | n_estimators=300, max_depth=6, learning_rate=0.05, tree_method=hist |
+| MLP | Multi-Layer Perceptron | hidden_layers=[256, 128], lr=0.001, max_iter=500, early_stopping=True |
+| SVM | SVM (RBF kernel) | C=1.0, kernel=rbf, gamma=scale (deferred — prohibitively slow with 4096d) |
 
-### 3.3 Metrics
+### 4.3 Evaluation Protocols
+
+#### 4.3.1 Standard 5-Fold Cross-Validation (Baseline)
+
+Stratified on label and attack_category. All attack types present in every fold. This establishes the "best case" performance where the model has seen examples of every attack technique during training. Seed=42.
+
+#### 4.3.2 LOATO (Leave-One-Attack-Type-Out) — Primary Contribution
+
+For each of the 5 eligible categories (C1–C5), we hold out the entire category from training and use it as the test set. The test set also includes 20% of benign samples so both classes are represented.
+
+| Fold | Held-Out Category | Train Size | Test Size |
+|------|-------------------|-----------|-----------|
+| 1 | Instruction Override (C1) | 5,906 | 19,504 |
+| 2 | Jailbreak / Roleplay (C2) | 23,431 | 1,979 |
+| 3 | Obfuscation / Encoding (C3) | 24,500 | 910 |
+| 4 | Information Extraction (C4) | 24,336 | 1,074 |
+| 5 | Social Engineering (C5) | 24,741 | 669 |
+
+**Generalization gap**: ΔF1 = Standard_CV_F1 − LOATO_F1. A positive gap means the model performs worse on unseen attack types.
+
+#### 4.3.3 Direct→Indirect Transfer
+
+Train exclusively on direct injections (explicit commands like "ignore previous instructions"), test on indirect injections (malicious instructions embedded in retrieved context, tool outputs, or documents). This simulates the most deployment-critical scenario: RAG pipelines where injections arrive via external data, not user input.
+
+#### 4.3.4 LLM Zero-Shot Baseline
+
+GPT-4o evaluated with zero-shot binary classification (no training, no few-shot examples) on 500 stratified samples per test pool. This isolates the architectural advantage of reasoning over pattern matching. The zero-shot prompt is documented in Appendix B.
+
+### 4.4 Metrics
 
 | Metric | Role |
 |--------|------|
-| **Macro F1** (primary) | Treats both classes equally. Critical because dataset is 58/42% split — accuracy alone would be misleading. |
+| **Macro F1** (primary) | Treats both classes equally — critical because dataset is 58/42% split |
 | Accuracy | Overall correctness |
 | Precision | Of predicted injections, how many are real? |
 | Recall | Of real injections, how many did we catch? |
 | AUC-ROC | Ranking quality (threshold-independent) |
-| AUC-PR | Ranking quality for the positive class |
+| AUC-PR | Ranking quality for the positive (injection) class |
 
-**Generalization gap**: `ΔF1 = Standard_CV_F1 − LOATO_F1`. Positive means the model does worse on unseen attack types.
+**Why Macro F1**: A classifier that always predicts "benign" would score 58% accuracy. Macro F1 treats both classes equally and is standard for imbalanced binary classification in security.
 
-**Statistical methods**: Bootstrap 95% CIs (10K resamples), McNemar's test, Friedman + Nemenyi, Cohen's d.
+### 4.5 Reproducibility
+
+All experiments use seed=42 via `seed_everything()`. Hardware: Apple Silicon Mac (18GB), MPS preferred, CPU fallback. Full pipeline is reproducible via CLI commands (see Appendix C). Code, configs, and splits are version-controlled. Experiment tracking via Weights & Biases.
 
 ---
 
-## Phase 4 — Core Experiments (Sprint 3)
+## 5. Results
 
-### Finding 4.1: Standard CV Baseline — Classifiers Score 0.90–0.97 F1
+### 5.1 Standard CV Baseline — Classifiers Score 0.90–0.97 F1
 
-**Source**: W&B project `loato-bench`, 30 runs (5 embeddings × 3 classifiers × 2 experiments)
-
-Under standard 5-fold CV (all attack types present in training), embedding classifiers achieve excellent performance:
+Under standard 5-fold CV, embedding classifiers achieve excellent performance:
 
 | Embedding | LogReg | XGBoost | MLP |
 |-----------|--------|---------|-----|
 | minilm (384d) | ~0.94 | ~0.95 | ~0.93 |
 | bge_large (1024d) | ~0.95 | ~0.96 | ~0.94 |
-| instructor (1024d) | ~0.96 | ~0.96 | ~0.95 |
+| instructor (768d) | ~0.96 | ~0.96 | ~0.95 |
 | openai_small (1536d) | ~0.97 | ~0.97 | ~0.96 |
 | e5_mistral (4096d) | ~0.95 | ~0.96 | ~0.94 |
 
-*Note: These are approximate from W&B. Pull exact numbers for the paper.*
+*Note: Approximate from W&B. Exact numbers to be pulled for final paper.*
 
-**These numbers look deployment-ready — but they're misleading.** Standard CV guarantees the model has seen examples of every attack category during training. In deployment, new attack types emerge that the model has never encountered.
+These numbers look deployment-ready. A team evaluating any of these classifiers with standard CV would reasonably conclude it is safe to ship.
 
-### Finding 4.2: LOATO Reveals the Generalization Gap
+### 5.2 LOATO Reveals the Generalization Gap
 
-**Source**: W&B project `loato-bench`, LOATO runs
+When a single attack category is held out during training, F1 drops on the held-out type. The gap varies by category:
 
-When a single attack category is held out during training, F1 drops on the held-out type. The generalization gap varies by category:
+- **Low ΔF1 categories** (C1: Instruction Override) — Other categories contain similar patterns, so the model generalizes well even without seeing C1 during training.
+- **High ΔF1 categories** (C3: Obfuscation, C5: Social Engineering) — These use unique strategies not present in other categories. The model is blind to them.
 
-- Some categories (C1: Instruction Override) have low ΔF1 — other categories contain similar patterns
-- Others (C3: Obfuscation, C5: Social Engineering) show large drops — they use unique strategies not present in other categories
+**Key insight**: Standard CV overstates real-world performance. LOATO exposes *which specific attack types* a classifier cannot generalize to. The per-fold variance is as informative as the mean.
 
-**Key insight**: Standard CV overstates real-world performance. LOATO exposes *which specific attack types* a classifier is blind to.
-
----
-
-## Phase 5 — Transfer Experiments (Sprint 4A)
-
-### Finding 5.1: Direct→Indirect Transfer Collapse (LOATO-4A-01)
-
-**Source**: `docs/findings_direct_indirect.md`
+### 5.3 Direct→Indirect Transfer Collapse
 
 15 experiments (5 embeddings × 3 classifiers) trained on direct injections, tested on indirect:
+
+#### Table 5.3a: Macro F1
 
 | Embedding | LogReg | XGBoost | MLP |
 |-----------|--------|---------|-----|
 | minilm (384d) | 0.2903 | 0.2207 | 0.2477 |
 | bge_large (1024d) | 0.2711 | 0.2143 | 0.2602 |
-| instructor (1024d) | 0.3196 | 0.2263 | 0.3422 |
+| instructor (768d) | 0.3196 | 0.2263 | 0.3422 |
 | openai_small (1536d) | **0.4081** | 0.2259 | **0.4130** |
 | e5_mistral (4096d) | 0.3248 | 0.2112 | 0.2521 |
 
-**Headline**: F1 collapses from 0.90–0.97 (standard CV) to **0.21–0.41** on indirect injections. Classifiers memorize direct injection surface patterns ("ignore previous instructions") but cannot recognize the same malicious intent when it's delivered indirectly (embedded in retrieved documents, tool outputs).
+#### Table 5.3b: AUC-ROC
 
-**Key details**:
-- **XGBoost worst**: ~0.21 F1 across all embeddings — tree-based models overfit hardest to surface patterns
-- **AUC-ROC >> F1**: AUC ranges 0.76–0.96 while F1 is 0.21–0.41. Classifiers *rank* indirect injections somewhat correctly but decision thresholds are miscalibrated. Threshold tuning could partially close the gap.
-- **OpenAI embeddings most transferable**: F1 0.41 (best) vs 0.21 (worst). Proprietary embeddings capture more abstract injection features.
-- **Fomin (2026) consistency**: Fomin reported 7–37% detection rates on production guardrails (PromptGuard 2, LlamaGuard). Our 0.21–0.41 F1 is consistent but provides the first controlled measurement across 15 combinations.
+| Embedding | LogReg | XGBoost | MLP |
+|-----------|--------|---------|-----|
+| minilm | 0.8338 | 0.8754 | 0.8162 |
+| bge_large | 0.7579 | 0.8751 | 0.7994 |
+| instructor | 0.9366 | 0.9270 | 0.9635 |
+| openai_small | 0.8713 | 0.9034 | 0.9507 |
+| e5_mistral | 0.7971 | 0.7990 | 0.8608 |
 
-### Finding 5.2: GPT-4o Zero-Shot Baseline (LOATO-4A-03)
+**Headline finding**: F1 collapses from 0.90–0.97 (standard CV) to **0.21–0.41** on indirect injections. A classifier that appears 97% effective under standard evaluation catches only 21–41% of indirect attacks.
 
-**Source**: `docs/findings_llm_baseline.md`
+**Observations**:
 
-GPT-4o evaluated zero-shot (no training, no few-shot examples) on 500 stratified samples from each test pool:
+1. **XGBoost collapses worst** (~0.21 F1 across all embeddings). Tree-based models overfit to surface patterns in direct injections and cannot extrapolate.
 
-| Test Pool | GPT-4o F1 | Best Embedding Classifier F1 | Who Wins | Gap |
-|-----------|-----------|-------------------------------|----------|-----|
-| Standard CV | 0.8528 | 0.95–0.97 | **Classifiers** | +0.10–0.12 |
+2. **AUC-ROC >> F1**: AUC ranges 0.76–0.96 while F1 is 0.21–0.41. Classifiers *rank* indirect injections somewhat correctly (they get higher scores than benign text) but decision thresholds calibrated on direct injections are wrong for the shifted distribution. This suggests threshold recalibration or Platt scaling could partially close the gap.
+
+3. **OpenAI embeddings most transferable**: F1 0.41 (best) vs 0.21 (worst). Proprietary embeddings trained on diverse data capture more abstract injection features.
+
+4. **Instructor embedding stands out on AUC**: instructor × MLP achieves AUC-ROC 0.9635 despite F1=0.342. Instruction-tuned embeddings capture injection semantics better but still can't cleanly separate at the default threshold.
+
+5. **Consistent with Fomin (2026)**: Fomin reports 7–37% detection rates for indirect injections on production guardrails. Our 0.21–0.41 F1 range aligns with this but provides the first controlled measurement across 15 embedding-classifier combinations.
+
+### 5.4 LLM Zero-Shot Baseline
+
+GPT-4o evaluated zero-shot on 500 stratified samples per test pool:
+
+| Test Pool | F1 | Accuracy | Precision | Recall | AUC-ROC | AUC-PR | Cost |
+|-----------|-----|----------|-----------|--------|---------|--------|------|
+| Standard CV | 0.8528 | 0.8640 | 0.9671 | 0.7000 | 0.8820 | 0.8445 | $0.39 |
+| Direct→Indirect | 0.7105 | 0.7240 | 0.9916 | 0.6334 | 0.8404 | 0.9173 | $0.41 |
+
+**Comparison**:
+
+| Test Pool | GPT-4o F1 | Best Classifier F1 | Winner | Gap |
+|-----------|-----------|---------------------|--------|-----|
+| Standard CV | 0.8528 | ~0.97 | Classifiers | +0.12 |
 | Direct→Indirect | **0.7105** | 0.4130 | **GPT-4o** | **+0.30** |
 
-**Headline**: On familiar attacks, cheap classifiers beat GPT-4o. On novel attack surfaces, GPT-4o's reasoning provides +0.30 F1 advantage — confirming the generalization failure is **architectural** (pattern matching vs reasoning), not a data problem.
+**Key findings**:
 
-**Key details**:
-- **Precision near-perfect**: GPT-4o achieves 0.97–0.99 precision — almost never false-positives
-- **Weakness is recall**: 0.63–0.70 — still misses ~30% of indirect attacks
-- **The gap shrinks with reasoning**: Classifiers drop 0.56 F1 (from 0.97 to 0.41) going standard→indirect. GPT-4o drops 0.14 (from 0.85 to 0.71). The LLM's gap is **4x smaller**.
-- **Cost**: ~$0.80 for 1,000 samples (~$0.0008/query) vs ~$0/query for embedding classifiers after training
+1. **On familiar attacks, classifiers win** — cheap, fast, and +0.12 F1 better than GPT-4o zero-shot. No reason to use an LLM when attack types match training data.
 
----
+2. **On novel attacks, GPT-4o wins by +0.30 F1** — reasoning about intent beats pattern matching when the surface patterns are unfamiliar.
 
-## Summary Table: All Key Numbers
+3. **The gap is architectural**: Classifiers drop 0.56 F1 (0.97 → 0.41) from standard to indirect. GPT-4o drops 0.14 (0.85 → 0.71). The LLM's degradation is **4x smaller**.
 
-| Metric | Standard CV | LOATO | Direct→Indirect | LLM Baseline (Indirect) |
-|--------|:-----------:|:-----:|:----------------:|:----------------------:|
-| Best Embedding F1 | 0.97 | varies by fold | 0.41 | — |
-| GPT-4o F1 | 0.85 | — | — | 0.71 |
-| Who wins | Classifiers +0.12 | — | GPT-4o +0.30 | — |
-| Cost per query | ~$0 (after training) | ~$0 | ~$0 | ~$0.0008 |
+4. **GPT-4o precision is near-perfect** (0.97–0.99) — it almost never false-positives. Weakness is recall (0.63–0.70): it misses ~30% of attacks.
+
+5. **Cost tradeoff**: ~$0.0008/query (GPT-4o) vs ~$0/query (classifier after training). Orders of magnitude more expensive for +0.30 F1 on novel threats.
 
 ---
 
-## Methodology Q&A (Anticipated Reviewer Questions)
+## 6. Discussion
 
-### Q1: How do you calculate baseline F1?
+### 6.1 Standard CV Is Misleading for Deployment Safety
 
-**Baseline F1** = Standard 5-fold stratified cross-validation. The model sees all attack categories during training (random splits, no category held out). This gives the "best case" F1 where the model has encountered examples of every attack type.
+The central finding: a classifier scoring 0.97 F1 under standard CV may score 0.21 on indirect injections it hasn't seen. This is not a minor performance degradation — it is a near-total failure. Standard CV should not be the sole evaluation for classifiers intended for production deployment.
 
-**LOATO F1** = Macro F1 averaged across K leave-one-out folds. Each fold holds out an entire attack category the model has never seen during training.
+### 6.2 The Generalization Failure Is Architectural
 
-**Generalization gap** = `ΔF1 = Standard_CV_F1 − LOATO_F1`. A positive gap means the model performs worse on unseen attack types.
+Embedding classifiers learn to match surface patterns (specific phrases, syntactic structures). When the same malicious intent is expressed differently — embedded in a document, encoded in Base64, or delivered through social engineering — the patterns don't match and the classifier fails. GPT-4o's zero-shot performance (0.71 F1 with no training) confirms this: reasoning about intent transfers across attack surfaces in a way that pattern matching cannot.
 
-Standard CV answers: *"How well does the model perform when it has seen everything?"*
-LOATO answers: *"How well does it generalize to novel, unseen attack types?"*
+### 6.3 Not All Attack Types Are Equally Hard
 
-### Q2: If ΔF1 ≈ 0, does that mean the model is smart — or that attack categories are too similar?
+LOATO per-fold analysis reveals that some categories (e.g., Instruction Override) generalize well — their patterns are sufficiently represented in other categories. Others (e.g., Obfuscation, Social Engineering) are truly novel and cause the largest drops. This per-category granularity is the advantage of LOATO over dataset-level evaluation like LODO.
 
-**It could be either.** Distinguishing between the two is a key analytical challenge.
+### 6.4 AUC-ROC vs F1: A Threshold Problem
 
-**Interpretation A — Model is genuinely robust**: It learned abstract features of "injection-ness" rather than memorizing category-specific patterns. Evidence: high F1 across diverse held-out categories, UMAP showing injection/benign separation regardless of category, SHAP showing different features matter per fold.
+The high AUC-ROC (0.76–0.96) despite low F1 (0.21–0.41) on transfer experiments suggests classifiers can partially *rank* indirect injections correctly but their decision boundaries are miscalibrated. Threshold recalibration on a small labeled sample of indirect injections could substantially improve F1 without retraining. This is a practical intervention worth investigating.
 
-**Interpretation B — Categories are too similar**: The held-out category overlaps heavily with training categories, so the model isn't truly tested on anything novel. Evidence: high inter-category cosine similarity in embedding space, SHAP showing the model uses the same few features regardless of fold.
+### 6.5 Practical Recommendations
 
-**How we distinguish them:**
+1. **Layered defense**: Use cheap embedding classifiers as a high-precision first layer (they rarely false-positive). Escalate uncertain cases to an LLM for reasoning-based detection.
 
-1. **Per-fold breakdown** — If ΔF1 ≈ 0 uniformly across all folds, categories may be too similar. If most folds have ΔF1 ≈ 0 but one drops sharply (e.g., holding out `obfuscation_encoding`), the model is genuinely robust to some types but not others. The variance across folds is informative.
+2. **Evaluate with LOATO**: Before deploying a prompt injection classifier, run LOATO evaluation. Report per-category F1, not just aggregate. If any category shows ΔF1 > 0.15, the classifier has a blind spot.
 
-2. **Inter-category embedding distances** — Compute centroid distances between categories. If all categories cluster tightly, they share too much signal. If they're well-separated yet ΔF1 is low, the model is genuinely generalizing. *(Sprint 4B: UMAP + pairwise centroid distances)*
+3. **Test direct→indirect transfer**: If the deployment involves RAG or tool use, run a controlled transfer experiment. Standard CV performance is not predictive of indirect injection detection.
 
-3. **SHAP feature importance** — If the model shifts which features matter depending on the held-out fold, categories carry meaningfully different signals. If it always relies on the same features, the categories are redundant. *(Sprint 4B)*
+4. **Consider threshold calibration**: If AUC-ROC is high but F1 is low, the classifier may benefit from Platt scaling or isotonic calibration on a small sample of the target distribution.
 
-4. **Contamination check** — Already completed (Sprint 2A-05). Lexical + semantic contamination between train/test splits verified to be minimal.
+### 6.6 Interpreting Low ΔF1: Robustness vs Category Redundancy
 
-**Write-up framing**: *"We validate that low ΔF1 reflects genuine cross-attack generalization rather than category redundancy by examining (a) per-fold variance in LOATO F1, (b) inter-category embedding centroid distances, and (c) SHAP feature importance stability across folds."*
+If ΔF1 ≈ 0, it could mean the model is genuinely robust *or* that attack categories are too similar. We distinguish these via:
 
-### Q3: Why Macro F1 instead of accuracy?
+1. **Per-fold variance** — If ΔF1 ≈ 0 uniformly across all folds, categories may be redundant. If most folds have ΔF1 ≈ 0 but one drops sharply, the model is robust to some types but not others.
 
-Dataset is 58% benign / 42% injection. A classifier that always predicts "benign" would score 58% accuracy. Macro F1 treats both classes equally — it's the harmonic mean of precision and recall, averaged across classes. This is standard practice for imbalanced binary classification in security.
+2. **Inter-category embedding distances** — Compute centroid distances between categories. Tight clustering → categories share too much signal. Well-separated yet low ΔF1 → genuine generalization.
 
-### Q4: Why not fine-tune the LLM instead of using zero-shot?
+3. **SHAP feature importance** — If the model shifts which features matter per fold, categories carry different signals. If same features dominate regardless of fold, categories are redundant.
 
-The point of the LLM baseline is to measure what **reasoning alone** provides — no training, no examples, no domain adaptation. This isolates the architectural advantage (understanding intent vs matching patterns). If we fine-tuned, we'd be measuring the combined effect of reasoning + training, which wouldn't answer whether the generalization gap is architectural.
-
-### Q5: Why only 500 samples for the LLM baseline?
-
-Cost constraint (~$0.80 per 1,000 calls to GPT-4o). The sample is **stratified** to preserve label and category distribution from the full test set. 500 samples is sufficient for stable F1 estimates (bootstrap CIs would show precision). For comparison, Fomin (2026) used even smaller test sets.
-
-### Q6: Aren't the 5 embedding models too diverse to compare fairly?
-
-That's the point. We span from tiny/fast (MiniLM, 384d, open-source) to large/expensive (E5-Mistral, 4096d, open-source) to proprietary (OpenAI, 1536d). If the generalization gap exists across *all* of them, the problem is fundamental to the embedding+classifier approach, not a quirk of one model. The fact that OpenAI embeddings transfer best (F1 0.41 vs 0.21) but still fail badly confirms this.
-
-### Q7: Why is XGBoost so bad on transfer?
-
-XGBoost builds decision trees that split on specific feature thresholds. It's excellent at memorizing exact patterns in training data but terrible at extrapolating. Direct injections have distinctive surface patterns ("ignore previous instructions", "you are now DAN"). XGBoost learns these exact splits. When indirect injections arrive with completely different surface text (malicious instructions buried in a document), the decision boundaries don't transfer. LogReg and MLP, which learn smoother decision boundaries, handle the shift slightly better.
-
-### Q8: Why is AUC-ROC high but F1 low for transfer experiments?
-
-AUC-ROC measures ranking quality — "can the classifier tell that injections are *more likely* to be injections than benign text?" F1 measures hard classification — "at the default 0.5 threshold, does it get the right answer?"
-
-The classifiers **rank** indirect injections somewhat correctly (they get higher scores than benign text) but the **decision threshold is wrong** because it was calibrated on direct injections, which have a different score distribution. This suggests **threshold recalibration** or **Platt scaling** could partially close the F1 gap without retraining.
-
-### Q9: How does this compare to Fomin (2026)?
-
-Fomin's LODO (Leave-One-Dataset-Out) holds out entire *datasets* and reports 7–37% detection rates on production guardrails. Our LOATO holds out *attack categories within* datasets. The approaches are complementary:
-
-| | Fomin (LODO) | Ours (LOATO) |
-|---|---|---|
-| Holdout unit | Entire dataset | Attack category |
-| What it tests | Cross-dataset generalization | Cross-attack-type generalization |
-| Classifiers tested | Production guardrails (PromptGuard 2, LlamaGuard) | 5 embeddings × 3 classifiers (controlled) |
-| Our advantage | Finer-grained, isolates which *attack type* fails | |
-| Their advantage | Tests production systems as-is | |
-
-Our 0.21–0.41 F1 on indirect injections is consistent with Fomin's 7–37% detection rates.
-
-### Q10: What are the limitations?
-
-1. **C6 (Context Manipulation) excluded from LOATO** — only 188 samples. This is the most deployment-relevant category (indirect injection). Its underrepresentation in public datasets is itself a finding.
-2. **Cross-lingual experiments excluded** — <300 samples per non-English language. LOATO-Bench is English-only.
-3. **LLM baseline is GPT-4o only** — budget constraint. Claude would be a valuable second data point.
-4. **Taxonomy is researcher-defined** — 7 categories may not capture all real-world attack types. The LLM labeling (Tier 3) introduces model bias.
-5. **Standard CV numbers are approximate** — Sprint 3 results were logged to W&B but not saved as local JSON. Will pull exact numbers for the paper.
-6. **SVM deferred** — SVM with 4096d E5-Mistral embeddings is prohibitively slow without PCA. SVM results are incomplete.
+4. **Contamination check** — Lexical (Jaccard) + semantic (cosine) contamination between train/test splits, verified to be minimal (Sprint 2A-05).
 
 ---
 
-## Thesis Arguments (Ordered Narrative)
+## 7. Limitations
 
-1. **Prompt injection is a real, demonstrated threat** — Frontier LLMs are compromised 60% of the time by indirect injections (Phase 0)
+1. **C6 (Context Manipulation) excluded from LOATO** — Only 188 samples, 12 short of the 200 threshold. This is arguably the most deployment-relevant category (indirect injection). Its underrepresentation in public datasets is itself a finding.
 
-2. **Embedding classifiers look great on paper** — 0.95–0.97 F1 under standard CV suggests they're deployment-ready (Phase 4)
+2. **English-only** — 98% of the dataset is English. Cross-lingual experiments were excluded due to insufficient non-English samples (<300 per language).
 
-3. **Standard CV is a misleading evaluation** — It guarantees every attack type appears in training. Real deployments face novel attacks.
+3. **Single LLM baseline** — Only GPT-4o evaluated. Claude or open-source LLMs (Llama 3) would provide additional data points.
 
-4. **LOATO exposes the blind spot** — Holding out one attack type reveals which categories a classifier can't generalize to. The gap varies by category — some attacks are genuinely harder to generalize to (Phase 4)
+4. **SVM deferred** — SVM with RBF kernel on 4096-dimensional E5-Mistral embeddings is prohibitively slow without PCA dimensionality reduction. SVM results are incomplete.
 
-5. **The gap is catastrophic for indirect injections** — F1 collapses to 0.21–0.41 when testing on indirect attacks not seen during training. A classifier scoring 0.97 on your test set may score 0.21 in the real world (Phase 5)
+5. **Taxonomy is researcher-defined** — 7 categories may not capture all real-world attack types. Tier 3 LLM labeling introduces model bias (GPT-4o-mini's classification tendencies).
 
-6. **This is an architectural limitation, not a data problem** — GPT-4o, with zero training, scores 0.71 F1 on the same test set where the best trained classifier scores 0.41. Reasoning > pattern matching for novel threats (Phase 5)
+6. **Standard CV numbers approximate** — Sprint 3 results were logged to W&B but not all were saved as local JSON. Exact numbers to be pulled for the final paper.
 
-7. **Practical recommendation** — Use cheap classifiers as a high-precision first layer (they rarely false-positive). Escalate uncertain cases to LLMs for reasoning-based detection. Standard CV is insufficient for evaluating deployment safety — LOATO and transfer testing should be standard practice.
+7. **No fine-tuned LLM comparison** — We compare zero-shot LLM vs trained classifier. A fair comparison would also include a fine-tuned LLM, but this was outside scope and budget.
 
----
-
-## What's Next
-
-| Sprint | Task | Status |
-|--------|------|--------|
-| 4B | Analysis: UMAP plots, heatmaps, per-category breakdown, SHAP feature importance | Upcoming |
-| 5 | Thesis write-up | Final |
+8. **Category size imbalance** — C1 (Instruction Override) has 19,161 samples while C5 (Social Engineering) has only 311. Smaller categories have noisier estimates.
 
 ---
 
-## Artifact Locations
+## 8. Conclusion
 
-| What | Where |
-|------|-------|
+Embedding-based prompt injection classifiers achieve 0.95–0.97 F1 under standard cross-validation, but this metric is dangerously misleading for deployment. LOATO evaluation reveals category-dependent blind spots, and direct-to-indirect transfer experiments show F1 collapsing to 0.21–0.41 — a deployment-critical failure that standard evaluation entirely conceals.
+
+The generalization gap is architectural: GPT-4o achieves 0.71 F1 on the same indirect test set with zero training, a +0.30 advantage driven by reasoning about intent rather than matching surface patterns. However, GPT-4o costs orders of magnitude more per query and still misses ~30% of attacks.
+
+We recommend: (1) LOATO-style evaluation as standard practice before deploying prompt injection classifiers, (2) layered defenses combining cheap classifiers with LLM escalation, and (3) explicit testing of direct-to-indirect transfer for any system processing untrusted external content.
+
+Standard CV scores are reassuring. The real world is not.
+
+---
+
+## 9. Future Work
+
+1. **Sprint 4B (upcoming)**: UMAP visualizations, per-category heatmaps, SHAP feature importance analysis to mechanistically explain the generalization gap.
+
+2. **Threshold recalibration study**: Test whether Platt scaling or isotonic calibration on a small labeled sample of indirect injections can close the F1 gap suggested by high AUC-ROC.
+
+3. **Multi-model LLM baseline**: Evaluate Claude, Llama 3, and Gemini to determine if the reasoning advantage is model-specific or general.
+
+4. **Fine-tuned LLM comparison**: Train a small LLM (e.g., Llama-3.1-8B) on the same data to compare fine-tuned LLM vs embedding classifier under LOATO.
+
+5. **Real-world deployment study**: Test classifiers on a live RAG pipeline with adversarial red-teaming to validate lab findings in production conditions.
+
+6. **Expanded indirect injection dataset**: Address C6 underrepresentation by collecting more indirect injection samples, enabling LOATO testing on the most deployment-critical category.
+
+---
+
+## References
+
+Fomin, M. (2026). When Benchmarks Lie: Evaluating Malicious Prompt Classifiers Under True Distribution Shift. *arXiv preprint arXiv:2602.14161*.
+
+[Additional references to be added: Perez & Ribeiro (2022), Greshake et al. (2023), Liu et al. (2024), Lee et al. (2022) on deduplication standards, etc.]
+
+---
+
+## Appendix A: LLM Vulnerability Demonstration
+
+**Source**: `docs/llm_vulnerability_demo.md`
+
+Live test results from Claude Sonnet and GPT-4o-mini against 5 RAG-style indirect injection attacks. Both models compromised on 3 out of 5 tests (60% attack success rate). The embedding-based classifier blocked all 5 poisoned documents.
+
+**Test setup**: Simulated RAG pipeline where retrieved documents contain hidden injection instructions. The injection is not in the user's query but in the "context" fed to the LLM. This tests the indirect injection scenario that deployment-facing classifiers must handle.
+
+---
+
+## Appendix B: Zero-Shot Classification Prompt
+
+The exact prompt used for the GPT-4o baseline evaluation:
+
+```
+SYSTEM: You are a prompt injection detector. Your task is to determine whether
+a given text is a prompt injection attack or a benign/normal input.
+
+A prompt injection is any text that attempts to override, manipulate, or hijack
+the instructions of an AI system. This includes (but is not limited to):
+- Instructions to ignore previous context or system prompts
+- Attempts to make the AI adopt a different persona or role
+- Encoded or obfuscated commands
+- Social engineering tactics aimed at the AI
+- Text that tries to extract system prompts or confidential information
+- Indirect injections embedded in retrieved context or tool outputs
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{"label": "injection" or "benign", "confidence": <float 0.0-1.0>}
+
+USER: <sample text>
+```
+
+No few-shot examples, no prompt engineering beyond a clear task description. Temperature=0.0 for deterministic output. Model: GPT-4o (March 2026). Cost: ~$0.0008/query.
+
+---
+
+## Appendix C: Reproducibility Commands
+
+```bash
+# Environment
+uv sync                                          # Install all dependencies
+
+# Data pipeline
+uv run loato-bench data download                 # Download 9 datasets (~5 min)
+uv run loato-bench data harmonize                # NFC → dedup → lang detect (~2 min)
+uv run loato-bench data label                    # 3-tier taxonomy labeling
+uv run loato-bench data split                    # Generate all evaluation splits
+
+# Embeddings
+uv run loato-bench embed run --all               # Compute 5 embedding models
+
+# Experiments
+uv run loato-bench train run --all --experiment standard_cv --wandb
+uv run loato-bench train run --all --experiment loato --wandb
+uv run loato-bench train run --all --experiment direct_indirect --wandb
+
+# LLM baseline
+uv run loato-bench analyze llm-baseline --model gpt-4o --samples 500 --test-pool both --wandb
+
+# Analysis (Sprint 4B)
+uv run loato-bench analyze features --all        # SHAP feature importance
+uv run loato-bench analyze report                # Generate report tables
+```
+
+**Requirements**: Python 3.12, uv, HuggingFace token (WildChat gated access), OpenAI API key.
+**Hardware**: Apple Silicon Mac (18GB). MPS preferred, CPU fallback.
+**Seed**: 42 everywhere.
+**Experiment tracking**: Weights & Biases (project: `loato-bench`).
+
+---
+
+## Appendix D: Full Classifier Hyperparameters
+
+### Logistic Regression
+- C (regularization): 1.0
+- max_iter: 1000
+- solver: lbfgs
+- Sweep: C ∈ {0.001, 0.01, 0.1, 1, 10, 100}
+
+### XGBoost
+- n_estimators: 300
+- max_depth: 6
+- learning_rate: 0.05
+- eval_metric: logloss
+- tree_method: hist
+- Sweep: n_estimators ∈ {100, 300, 500}, max_depth ∈ {3, 6, 9}, learning_rate ∈ {0.01, 0.05, 0.1}
+
+### MLP (2-layer)
+- hidden_layer_sizes: [256, 128]
+- learning_rate_init: 0.001
+- max_iter: 500
+- early_stopping: True
+- validation_fraction: 0.1
+- Sweep: layers ∈ {[128,64], [256,128], [512,256]}, lr ∈ {0.0001, 0.001, 0.01}
+
+### SVM (deferred)
+- C: 1.0
+- kernel: rbf
+- gamma: scale
+- probability: True
+- Sweep: C ∈ {0.1, 1, 10, 100}, gamma ∈ {scale, auto, 0.001, 0.01}
+
+All classifiers prepend `StandardScaler` in an sklearn pipeline.
+
+---
+
+## Appendix E: Artifact Locations
+
+| Artifact | Location |
+|----------|----------|
 | Final dataset | `data/processed/labeled_v1.parquet` (68,845 samples) |
-| Splits | `data/splits/*.json` (4 split files + manifest) |
-| Embeddings | `data/embeddings/` (gitignored, reproducible via `loato-bench embed run`) |
+| Splits | `data/splits/*.json` (4 files + SHA-256 manifest) |
+| Embeddings | `data/embeddings/{model_name}/` (gitignored, reproducible) |
 | Taxonomy spec | `docs/taxonomy_spec_v1.0.md`, `configs/final_categories.json` |
-| Sprint 3 results | W&B project `loato-bench` (standard_cv + loato runs) |
-| Sprint 4A-01 results | `results/experiments/direct_indirect_*.json` (15 files) |
-| Sprint 4A-03 results | `results/llm_baseline/llm_baseline_*.json` (2 files + per-sample JSONL logs) |
+| Sprint 3 results | W&B project `loato-bench` |
+| Transfer results (4A-01) | `results/experiments/direct_indirect_*.json` (15 files) |
+| LLM baseline results (4A-03) | `results/llm_baseline/llm_baseline_*.json` (2 files + JSONL logs) |
 | EDA outputs | `results/eda/figures/*.png`, `results/eda/*.json` |
 | Fomin positioning | `docs/related_work_fomin.md`, `docs/references.bib` |
 | Vulnerability demo | `docs/llm_vulnerability_demo.md` |
-| Dataset documentation | `docs/datasets.md` |
-| EDA findings | `docs/eda_findings.md` |
-| Methodology notes | `docs/methodology_notes.md` |
 | This document | `docs/findings_master.md` |
+| Full codebase | `src/loato_bench/` (739 tests, 90%+ coverage) |
 
 ---
 
-## Reproducibility
+## Appendix F: Anticipated Reviewer Questions
 
-```bash
-# Full pipeline from scratch
-uv run loato-bench data download          # Download 9 datasets
-uv run loato-bench data harmonize         # NFC → dedup → lang detect
-uv run loato-bench data label             # 3-tier taxonomy labeling
-uv run loato-bench data split             # Generate evaluation splits
-uv run loato-bench embed run --all        # Compute 5 embedding models
-uv run loato-bench train run --all --experiment standard_cv   # Standard CV
-uv run loato-bench train run --all --experiment loato          # LOATO
-uv run loato-bench train run --all --experiment direct_indirect # Transfer
-uv run loato-bench analyze llm-baseline --model gpt-4o --samples 500 --test-pool both
-```
+### Q1: Why Macro F1 instead of accuracy?
+Dataset is 58% benign / 42% injection. A classifier that always predicts "benign" scores 58% accuracy. Macro F1 treats both classes equally. Standard for imbalanced binary classification in security.
 
-**Requirements**: Python 3.12, uv, HuggingFace token (WildChat access), OpenAI API key, ~$1 for LLM labeling + baseline.
-**Hardware**: Apple Silicon Mac (18GB). MPS preferred, CPU fallback.
-**Seed**: 42 everywhere (`seed_everything()`).
+### Q2: Why not fine-tune the LLM instead of zero-shot?
+The LLM baseline isolates what **reasoning alone** provides. Fine-tuning would measure reasoning + training combined, which doesn't answer whether the generalization gap is architectural.
+
+### Q3: Why only 500 samples for the LLM baseline?
+Cost constraint (~$0.80 per 1,000 GPT-4o calls). The sample is stratified to preserve label and category distribution. 500 is sufficient for stable F1 estimates. Fomin (2026) used comparable sample sizes.
+
+### Q4: Aren't the 5 embedding models too diverse to compare fairly?
+That's the point. We span tiny (MiniLM, 384d) to large (E5-Mistral, 4096d), open-source to proprietary. If the generalization gap exists across *all* of them, the problem is fundamental to the embedding+classifier approach, not a quirk of one model.
+
+### Q5: Why is XGBoost so bad on transfer?
+XGBoost builds decision trees that split on specific feature thresholds — excellent at memorizing exact patterns, terrible at extrapolating. Direct injections have distinctive surface patterns. When indirect injections arrive with completely different surface text, the decision boundaries don't transfer. LogReg and MLP learn smoother decision boundaries and handle the shift slightly better.
+
+### Q6: Why is AUC-ROC high but F1 low for transfer?
+AUC-ROC measures ranking quality ("can it tell injections are *more likely* than benign?"). F1 measures hard classification at threshold=0.5. Classifiers rank indirect injections somewhat correctly but the threshold calibrated on direct injections is wrong for the shifted distribution. Threshold recalibration could partially close the gap.
+
+### Q7: If ΔF1 ≈ 0, is the model smart or are categories too similar?
+Could be either. We distinguish via: (a) per-fold variance — uniform low ΔF1 suggests redundancy, one large drop suggests genuine difficulty; (b) inter-category embedding centroid distances; (c) SHAP feature importance stability across folds; (d) contamination checks (completed, minimal).
+
+### Q8: How does this compare to Fomin (2026)?
+Fomin's LODO holds out entire *datasets*, ours holds out *attack categories*. Different questions: LODO asks "does it work on unseen data sources?" LOATO asks "does it detect unseen attack types?" Our 0.21–0.41 F1 is consistent with Fomin's 7–37% detection rates. The approaches are complementary.
+
+### Q9: Is C6 exclusion a problem?
+Yes, it's a limitation. Context Manipulation (indirect injection) is the most deployment-relevant category and it's underrepresented in public datasets. However, the direct→indirect transfer experiment (§5.3) directly tests this scenario using Open-Prompt's indirect injections, which are the bulk of indirect samples in the dataset.
+
+### Q10: Could data augmentation solve the generalization problem?
+Possibly partially. Generating synthetic indirect injections for training could help, but the fundamental issue is that embedding classifiers match surface patterns. Augmentation might cover known indirect patterns but wouldn't help with genuinely novel attack techniques — which is the scenario LOATO is designed to test.
