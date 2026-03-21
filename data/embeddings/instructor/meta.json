@@ -1,8 +1,0 @@
-{
-  "model_name": "instructor",
-  "model_version": "instructor",
-  "text_hash": "fde8746009f8123cc7d620f4d41cfe39d348e39650c8bd9c78b2e9e524002c4b",
-  "n_samples": 68845,
-  "dim": 1024,
-  "created_at": "2026-03-19T21:26:39.968108+00:00"
-}

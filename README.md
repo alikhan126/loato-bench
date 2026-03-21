@@ -96,75 +96,55 @@ The benchmark dataset is built from 5 public sources through a multi-stage pipel
 
 ## Data & Reproducibility
 
-### Why Git LFS?
+### Artifacts on Hugging Face Hub
 
-Several data files (parquet datasets, split indices, labeling outputs) are between 1–7MB each. GitHub rejects files over 100MB and warns above 50MB, and committing multi-megabyte binaries directly bloats the repo's clone size permanently (they can't be garbage-collected from git history). Git LFS replaces these files with lightweight pointers in the repo while storing the actual content on a separate LFS server. This keeps `git clone` fast while still versioning the data.
+Pre-computed embeddings (~2.2 GB), experiment results, dataset files, and splits are hosted on Hugging Face Hub for full reproducibility without re-running the pipeline:
 
-### Git LFS Setup
+**Repo: [alikhan126/loato-bench-artifacts](https://huggingface.co/datasets/alikhan126/loato-bench-artifacts)**
 
-**Git LFS must be installed before cloning**, otherwise you'll get 130-byte pointer files instead of actual data.
-
-```bash
-# Install Git LFS (one-time per machine)
-brew install git-lfs   # macOS
-git lfs install        # configures git hooks
-
-# Then clone normally — LFS files download automatically
-git clone <repo-url>
-```
-
-If you already cloned without LFS, retroactively fetch the real files:
+Download everything with one command:
 
 ```bash
-git lfs install
-git lfs pull
+uv run python scripts/download_artifacts.py
 ```
 
-### What's Tracked and Why
+Or download selectively:
 
-We commit only the files that are **hard to reproduce** (require API calls, manual review, or represent the exact dataset the experiments run on) or that serve as an **audit trail** for the committee. Everything that's cheap to regenerate from code is gitignored.
+```bash
+uv run python scripts/download_artifacts.py --only embeddings  # ~2.2 GB
+uv run python scripts/download_artifacts.py --only results     # experiment JSONs
+uv run python scripts/download_artifacts.py --only data        # parquets + splits
+```
 
-#### Datasets (LFS)
+#### What's on HF Hub
 
-| File | Size | Why it's tracked |
-|------|------|------------------|
-| `data/processed/unified_dataset.parquet` | ~8MB | The harmonized benchmark before labeling — proves the dedup/filtering pipeline output. Regenerating requires downloading all 9 source datasets and re-running harmonization. |
-| `data/processed/labeled_v1.parquet` | ~8MB | The final labeled dataset (68,845 samples) that all experiments run on. This is the single artifact that must be identical across all experiment runs for results to be comparable. |
+| Artifact | Size | Contents |
+|----------|------|----------|
+| `embeddings/` | ~2.2 GB | Pre-computed embeddings for all 5 models (`.npz` + metadata) |
+| `results/experiments/` | ~256 KB | 30 experiment result JSONs (5 models × 3 classifiers × 2 protocols) |
+| `data/processed/` | ~16 MB | `labeled_v1.parquet` + `unified_dataset.parquet` |
+| `data/splits/` | ~6 MB | All 4 split index files + manifest |
 
-#### Splits (LFS)
+### What's in Git (LFS)
 
-| File | Size | Why it's tracked |
-|------|------|------------------|
-| `data/splits/standard_cv_folds.json` | 2.3MB | 5-fold stratified CV indices. Exact fold assignments matter for reproducibility — even with the same seed, library version differences could produce different splits. |
-| `data/splits/loato_splits.json` | 3.3MB | LOATO fold indices (6 folds, one per eligible category). This is the core evaluation protocol — the primary contribution of the thesis. |
-| `data/splits/direct_indirect_split.json` | 340KB | Direct→indirect transfer experiment indices. |
-| `data/splits/crosslingual_split.json` | 341KB | English→non-English transfer experiment indices. |
-| `data/splits/split_manifest.json` | 1KB | SHA-256 checksums of all split files and `labeled_v1.parquet`. Allows anyone to verify data integrity without re-running the pipeline — if the checksums match, the experiments are running on the exact same data. |
-
-#### Labeling Audit Trail (LFS + Git)
-
-| File | Size | Storage | Why it's tracked |
-|------|------|---------|------------------|
-| `data/labeling/llm_labels_raw.jsonl` | 5MB | LFS | Every raw GPT-4o-mini response for Tier 3 labeling. This is the audit trail — it proves what the model was asked, what it returned, and how those responses were mapped to categories. Required for committee review and error analysis. |
-| `data/labeling/coverage_report.json` | 2KB | Git | Summary of how many samples each tier labeled. Shows that Tier 3 LLM was only used where Tiers 1+2 couldn't classify. |
-| `data/labeling/labeling_report.json` | 2KB | Git | Pipeline run summary (timestamps, sample counts, error rates). |
-
-#### Config Exports (Git)
+Small-to-medium data files that are hard to reproduce (require API calls or represent the exact dataset):
 
 | File | Why it's tracked |
 |------|------------------|
-| `configs/final_categories.json` | Machine-readable export of taxonomy v1.0 (7 categories, LOATO eligibility flags). Ensures configs and code stay in sync — generated from `taxonomy_spec.py`. |
+| `data/processed/*.parquet` | The exact dataset all experiments run on |
+| `data/splits/*.json` | Exact fold assignments for reproducibility |
+| `data/labeling/llm_labels_raw.jsonl` | Audit trail — raw GPT-4o-mini responses for Tier 3 labeling |
+| `data/labeling/coverage_report.json` | Labeling coverage statistics |
+| `configs/final_categories.json` | Taxonomy v1.0 export (7 categories) |
 
-### What's NOT Tracked and Why
+### What's NOT Tracked
 
-| Path | Why it's gitignored | How to reproduce |
-|------|---------------------|------------------|
-| `data/raw/` | Source datasets are publicly available and large (~200MB+). No reason to duplicate them in the repo. | `uv run loato-bench data download` |
-| `data/embeddings/` | `.npz` caches are deterministic given the same model + dataset. They're also large (hundreds of MB across 5 models). | `uv run loato-bench embed run --all` |
-| `data/labeling/batch_requests.jsonl` | 87MB batch API request file. Too large even for LFS, and fully reproducible from code + `unified_dataset.parquet`. | Re-run labeling pipeline |
-| `data/labeling/batch_id_mapping.json` | OpenAI batch job ID mapping — ephemeral, only useful during the API call. | Re-run labeling pipeline |
-| `results/` | All experiment outputs (trained models, metrics, figures). These are the *results* of the research, regenerated by running experiments. | Re-run experiments |
-| `.env` | Contains `OPENAI_API_KEY` and `WANDB_API_KEY`. Never commit secrets. | Copy `.env.example` and fill in your keys |
+| Path | How to reproduce |
+|------|------------------|
+| `data/raw/` | `uv run loato-bench data download` |
+| `data/embeddings/` | `uv run python scripts/download_artifacts.py --only embeddings` or `uv run loato-bench embed run --all` |
+| `results/` | `uv run python scripts/download_artifacts.py --only results` or re-run experiments |
+| `.env` | Copy `.env.example` and fill in your keys |
 
 ### Attack Taxonomy (v1.0)
 
@@ -188,28 +168,28 @@ This was consolidated from an earlier 8-category draft: `context_manipulation` (
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) package manager
-- [Git LFS](https://git-lfs.com/) — required for data files (see [Git LFS Setup](#git-lfs-setup) above)
+- [Git LFS](https://git-lfs.com/) — required for data files tracked in the repo
 - Apple Silicon Mac (MPS backend) recommended, CPU works too
 
 ### Installation
 
 ```bash
-# 1. Ensure Git LFS is installed (data files won't download without it)
+# 1. Install Git LFS (needed for parquet/split files in the repo)
 git lfs install
 
-# 2. Clone (LFS files download automatically during clone)
+# 2. Clone
 git clone <repo-url>
 cd loato-bench
 
 # 3. Install Python dependencies
 uv sync
 
-# 4. Set up API keys
+# 4. Download pre-computed artifacts (embeddings, results, data)
+uv run python scripts/download_artifacts.py
+
+# 5. Set up API keys (only needed if re-running embeddings or labeling)
 cp .env.example .env
 # Edit .env with your OPENAI_API_KEY and WANDB_API_KEY
-
-# 5. Verify data integrity (optional — checks SHA-256 hashes)
-cat data/splits/split_manifest.json
 ```
 
 ### Special Installs
