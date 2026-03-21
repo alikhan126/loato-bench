@@ -47,6 +47,7 @@ dependencies = [
     "python-dotenv>=1.0",
     # Robustness
     "tenacity>=8.5",
+    "tabulate>=0.10.0",
 ]
 
 [project.scripts]

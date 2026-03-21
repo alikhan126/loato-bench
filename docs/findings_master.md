@@ -10,7 +10,7 @@ MS Data Science, Pace University
 
 ## Abstract
 
-Embedding-based prompt injection classifiers achieve 0.95+ F1 under standard cross-validation, suggesting deployment readiness. However, standard CV guarantees every attack type appears in training — a condition violated in real deployments where novel attack techniques emerge continuously. We introduce LOATO-Bench (Leave-One-Attack-Type-Out Benchmark), an evaluation framework that holds out entire attack categories during training to measure cross-attack generalization. Using a unified dataset of 68,845 samples from 9 public sources, harmonized into a 7-category taxonomy, we evaluate 5 embedding models × 3 classifiers under three protocols: standard 5-fold CV, LOATO, and direct-to-indirect transfer. Our findings reveal a critical deployment blind spot: classifiers scoring 0.97 F1 under standard CV collapse to 0.21–0.41 F1 when tested on indirect injections unseen during training. A GPT-4o zero-shot baseline scores 0.71 F1 on the same indirect test set — a +0.30 advantage requiring no training — confirming the generalization failure is architectural. We argue that standard CV is insufficient for evaluating prompt injection classifiers intended for production deployment, and that LOATO-style evaluation should become standard practice.
+Embedding-based prompt injection classifiers achieve 0.977–0.997 F1 under standard cross-validation, suggesting deployment readiness. However, standard CV guarantees every attack type appears in training — a condition violated in real deployments where novel attack techniques emerge continuously. We introduce LOATO-Bench (Leave-One-Attack-Type-Out Benchmark), an evaluation framework that holds out entire attack categories during training to measure cross-attack generalization. Using a unified dataset of 68,845 samples from 9 public sources, harmonized into a 7-category taxonomy, we evaluate 5 embedding models × 3 classifiers under three protocols: standard 5-fold CV, LOATO, and direct-to-indirect transfer. LOATO reveals a mean generalization gap of ΔF1 = 0.034 across 15 combinations, with obfuscation/encoding attacks causing the largest drops (F1 = 0.919 when held out). More critically, classifiers scoring 0.997 F1 under standard CV collapse to 0.21–0.41 F1 when tested on indirect injections unseen during training. A GPT-4o zero-shot baseline scores 0.71 F1 on the same indirect test set — a +0.30 advantage requiring no training — confirming the generalization failure is architectural. We argue that standard CV is insufficient for evaluating prompt injection classifiers intended for production deployment, and that LOATO-style evaluation should become standard practice.
 
 **Keywords**: prompt injection, adversarial attacks, embedding classifiers, evaluation methodology, generalization, LLM security
 
@@ -242,30 +242,68 @@ All experiments use seed=42 via `seed_everything()`. Hardware: Apple Silicon Mac
 
 ## 5. Results
 
-### 5.1 Standard CV Baseline — Classifiers Score 0.90–0.97 F1
+### 5.1 Standard CV Baseline — Classifiers Score 0.977–0.997 F1
 
-Under standard 5-fold CV, embedding classifiers achieve excellent performance:
+Under standard 5-fold CV, embedding classifiers achieve excellent performance (Macro F1):
 
 | Embedding | LogReg | XGBoost | MLP |
 |-----------|--------|---------|-----|
-| minilm (384d) | ~0.94 | ~0.95 | ~0.93 |
-| bge_large (1024d) | ~0.95 | ~0.96 | ~0.94 |
-| instructor (768d) | ~0.96 | ~0.96 | ~0.95 |
-| openai_small (1536d) | ~0.97 | ~0.97 | ~0.96 |
-| e5_mistral (4096d) | ~0.95 | ~0.96 | ~0.94 |
+| MiniLM (384d) | 0.9770 | 0.9829 | 0.9920 |
+| BGE-Large (1024d) | 0.9894 | 0.9856 | 0.9941 |
+| Instructor (768d) | 0.9945 | 0.9936 | 0.9966 |
+| OpenAI-Small (1536d) | 0.9952 | 0.9925 | **0.9974** |
+| E5-Mistral (4096d) | 0.9937 | 0.9871 | 0.9958 |
 
-*Note: Approximate from W&B. Exact numbers to be pulled for final paper.*
-
-These numbers look deployment-ready. A team evaluating any of these classifiers with standard CV would reasonably conclude it is safe to ship.
+Mean F1 across all 15 combinations: **0.9912**. Best: OpenAI-Small × MLP (0.9974). These numbers look deployment-ready. A team evaluating any of these classifiers with standard CV would reasonably conclude it is safe to ship.
 
 ### 5.2 LOATO Reveals the Generalization Gap
 
-When a single attack category is held out during training, F1 drops on the held-out type. The gap varies by category:
+When a single attack category is held out during training, F1 drops. Mean LOATO F1 across all 15 combinations: **0.9568**, yielding a mean generalization gap of **ΔF1 = 0.0344**.
 
-- **Low ΔF1 categories** (C1: Instruction Override) — Other categories contain similar patterns, so the model generalizes well even without seeing C1 during training.
-- **High ΔF1 categories** (C3: Obfuscation, C5: Social Engineering) — These use unique strategies not present in other categories. The model is blind to them.
+#### Table 5.2a: LOATO F1 and ΔF1
 
-**Key insight**: Standard CV overstates real-world performance. LOATO exposes *which specific attack types* a classifier cannot generalize to. The per-fold variance is as informative as the mean.
+| Embedding | Classifier | CV F1 | LOATO F1 | ΔF1 |
+|-----------|------------|-------|----------|-----|
+| MiniLM (384d) | LogReg | 0.9770 | 0.9169 | **0.0601** |
+| MiniLM (384d) | XGBoost | 0.9829 | 0.9310 | 0.0519 |
+| MiniLM (384d) | MLP | 0.9920 | 0.9626 | 0.0294 |
+| BGE-Large (1024d) | LogReg | 0.9894 | 0.9565 | 0.0329 |
+| BGE-Large (1024d) | XGBoost | 0.9856 | 0.9275 | 0.0581 |
+| BGE-Large (1024d) | MLP | 0.9941 | 0.9760 | **0.0181** |
+| Instructor (768d) | LogReg | 0.9945 | 0.9670 | 0.0275 |
+| Instructor (768d) | XGBoost | 0.9936 | 0.9577 | 0.0359 |
+| Instructor (768d) | MLP | 0.9966 | 0.9770 | 0.0196 |
+| OpenAI-Small (1536d) | LogReg | 0.9952 | 0.9659 | 0.0293 |
+| OpenAI-Small (1536d) | XGBoost | 0.9925 | 0.9571 | 0.0354 |
+| OpenAI-Small (1536d) | MLP | 0.9974 | 0.9758 | 0.0216 |
+| E5-Mistral (4096d) | LogReg | 0.9937 | 0.9641 | 0.0297 |
+| E5-Mistral (4096d) | XGBoost | 0.9871 | 0.9398 | 0.0473 |
+| E5-Mistral (4096d) | MLP | 0.9958 | 0.9772 | 0.0187 |
+
+Largest gap: MiniLM × LogReg (ΔF1 = 0.060). Smallest gap: BGE-Large × MLP (ΔF1 = 0.018). Statistical testing: **3/15 combinations significant** (p < 0.05, paired t-test across folds) — all involving MiniLM or BGE-Large × LogReg/XGBoost.
+
+#### Table 5.2b: Per-Fold F1 by Held-Out Category (averaged across all 15 combinations)
+
+| Held-Out Category | Mean F1 | Hardest Combo | Easiest Combo |
+|---|---|---|---|
+| **instruction_override** | **0.9866** | MiniLM×LogReg (0.967) | OpenAI-Small×MLP (0.996) |
+| other | 0.9851 | MiniLM×LogReg (0.962) | BGE-Large×MLP (0.994) |
+| information_extraction | 0.9573 | MiniLM×LogReg (0.914) | OpenAI-Small×MLP (0.989) |
+| jailbreak_roleplay | 0.9493 | MiniLM×LogReg (0.912) | OpenAI-Small×MLP (0.972) |
+| social_engineering | 0.9463 | MiniLM×LogReg (0.869) | E5-Mistral×MLP (0.981) |
+| **obfuscation_encoding** | **0.9186** | MiniLM×LogReg (0.878) | BGE-Large×MLP (0.964) |
+
+**Key findings**:
+
+1. **Obfuscation/Encoding (C3) is the hardest** — mean F1 = 0.919 when held out. Encoded attacks (Base64, ROT13, leetspeak) use patterns not shared with other categories.
+
+2. **Instruction Override (C1) is the easiest** — mean F1 = 0.987 when held out. Other categories contain similar "ignore/override" patterns, so the model generalizes even without explicit C1 training.
+
+3. **MLP consistently has the smallest gap** across all embeddings (0.018–0.029 ΔF1). Its smooth decision boundaries generalize better than XGBoost's tree-based splits (0.035–0.058 ΔF1).
+
+4. **Higher-quality embeddings narrow the gap** — MiniLM (cheapest) has the widest range (0.029–0.060 ΔF1), while Instructor/OpenAI/E5-Mistral cluster in a tighter range (0.019–0.047).
+
+5. **The gap connects to template homogeneity** — Categories with higher template homogeneity (surface-level patterns, e.g., C1) are easier to detect even when held out. Semantically diverse categories (C3, C5) expose the generalization gap most starkly.
 
 ### 5.3 Direct→Indirect Transfer Collapse
 
@@ -389,17 +427,17 @@ If ΔF1 ≈ 0, it could mean the model is genuinely robust *or* that attack cate
 
 5. **Taxonomy is researcher-defined** — 7 categories may not capture all real-world attack types. Tier 3 LLM labeling introduces model bias (GPT-4o-mini's classification tendencies).
 
-6. **Standard CV numbers approximate** — Sprint 3 results were logged to W&B but not all were saved as local JSON. Exact numbers to be pulled for the final paper.
+6. **No fine-tuned LLM comparison** — We compare zero-shot LLM vs trained classifier. A fair comparison would also include a fine-tuned LLM, but this was outside scope and budget.
 
-7. **No fine-tuned LLM comparison** — We compare zero-shot LLM vs trained classifier. A fair comparison would also include a fine-tuned LLM, but this was outside scope and budget.
+8. **Only 3/15 LOATO gaps are statistically significant** — With only 5–6 folds per LOATO experiment, paired t-tests have low power. The gaps are consistent in direction (always positive) but most p-values fall in 0.06–0.15. Bootstrap CIs or more folds would strengthen significance claims.
 
-8. **Category size imbalance** — C1 (Instruction Override) has 19,161 samples while C5 (Social Engineering) has only 311. Smaller categories have noisier estimates.
+9. **Category size imbalance** — C1 (Instruction Override) has 19,161 samples while C5 (Social Engineering) has only 311. Smaller categories have noisier estimates.
 
 ---
 
 ## 8. Conclusion
 
-Embedding-based prompt injection classifiers achieve 0.95–0.97 F1 under standard cross-validation, but this metric is dangerously misleading for deployment. LOATO evaluation reveals category-dependent blind spots, and direct-to-indirect transfer experiments show F1 collapsing to 0.21–0.41 — a deployment-critical failure that standard evaluation entirely conceals.
+Embedding-based prompt injection classifiers achieve 0.977–0.997 F1 under standard cross-validation, but this metric is misleading for deployment. LOATO evaluation reveals a mean ΔF1 = 0.034 with category-dependent blind spots (obfuscation/encoding: F1 = 0.919 when held out). More critically, direct-to-indirect transfer experiments show F1 collapsing to 0.21–0.41 — a deployment-critical failure that standard evaluation entirely conceals.
 
 The generalization gap is architectural: GPT-4o achieves 0.71 F1 on the same indirect test set with zero training, a +0.30 advantage driven by reasoning about intent rather than matching surface patterns. However, GPT-4o costs orders of magnitude more per query and still misses ~30% of attacks.
 
@@ -411,7 +449,7 @@ Standard CV scores are reassuring. The real world is not.
 
 ## 9. Future Work
 
-1. **Sprint 4B (upcoming)**: UMAP visualizations, per-category heatmaps, SHAP feature importance analysis to mechanistically explain the generalization gap.
+1. **Sprint 4B (in progress)**: UMAP visualizations, SHAP feature importance analysis, threshold calibration study, template homogeneity correlation with ΔF1. Core results tables, ΔF1 heatmap, and per-fold analysis completed (LOATO-4B-01).
 
 2. **Threshold recalibration study**: Test whether Platt scaling or isotonic calibration on a small labeled sample of indirect injections can close the F1 gap suggested by high AUC-ROC.
 
@@ -548,14 +586,15 @@ All classifiers prepend `StandardScaler` in an sklearn pipeline.
 | Splits | `data/splits/*.json` (4 files + SHA-256 manifest) |
 | Embeddings | `data/embeddings/{model_name}/` (gitignored, reproducible) |
 | Taxonomy spec | `docs/taxonomy_spec_v1.0.md`, `configs/final_categories.json` |
-| Sprint 3 results | W&B project `loato-bench` |
+| Sprint 3 results | `results/experiments/standard_cv_*.json`, `results/experiments/loato_*.json` (30 files) |
+| 4B-01 analysis | `analysis/figures/*.{png,pdf}`, `analysis/tables/*.{md,tex}`, `analysis/4b_01_summary.md` |
 | Transfer results (4A-01) | `results/experiments/direct_indirect_*.json` (15 files) |
 | LLM baseline results (4A-03) | `results/llm_baseline/llm_baseline_*.json` (2 files + JSONL logs) |
 | EDA outputs | `results/eda/figures/*.png`, `results/eda/*.json` |
 | Fomin positioning | `docs/related_work_fomin.md`, `docs/references.bib` |
 | Vulnerability demo | `docs/llm_vulnerability_demo.md` |
 | This document | `docs/findings_master.md` |
-| Full codebase | `src/loato_bench/` (739 tests, 90%+ coverage) |
+| Full codebase | `src/loato_bench/` (769 tests, 90%+ coverage) |
 
 ---
 
