@@ -16,6 +16,20 @@ Live test results from Claude Sonnet and GPT-4o-mini against direct and RAG-styl
 **Status**: Complete
 **Last Updated**: February 19, 2026
 
+### [**findings_direct_indirect.md**](./findings_direct_indirect.md) — Direct→Indirect Transfer Findings
+**Sprint 4A: LOATO-4A-01 Transfer Experiments**
+
+Results from 15 experiments (5 embeddings × 3 classifiers) training on direct injections and testing on indirect. F1 collapses to 0.21–0.41, revealing a deployment-critical blind spot. Includes comparison with Fomin (2026).
+
+**Status**: Complete
+**Last Updated**: March 21, 2026
+
+### [**related_work_fomin.md**](./related_work_fomin.md) — Fomin (2026) Positioning
+Positioning against Fomin's LODO paper (arXiv:2602.14161). Includes citation, Related Work paragraph draft, sharpened contributions list, and differentiators table.
+
+**Status**: Complete
+**Last Updated**: March 21, 2026
+
 ### [**EDA.md**](./eda.md) — Exploratory Data Analysis
 **Sprint 1A: Data Quality Assessment & Taxonomy Validation**
 
@@ -139,10 +153,10 @@ Can embedding-based classifiers **generalize to novel attack types** they've nev
 | **Sprint 0** | Scaffolding | ✅ Complete | README.md |
 | **Sprint 1A** | Data + EDA | ✅ Complete | **eda.md** |
 | **Sprint 1B** | Embeddings | ✅ Complete | - |
-| **Sprint 2A** | Taxonomy + Splits | ⏳ Next | TBD |
-| **Sprint 2B** | Classifiers | ⏳ Upcoming | TBD |
-| **Sprint 3** | Experiments | ⏳ Upcoming | TBD |
-| **Sprint 4A** | Transfer | ⏳ Upcoming | TBD |
+| **Sprint 2A** | Taxonomy + Splits | ✅ Complete | taxonomy_spec_v1.0.md |
+| **Sprint 2B** | Classifiers | ✅ Complete | - |
+| **Sprint 3** | Experiments | ✅ Complete | - |
+| **Sprint 4A** | Transfer | ⏳ In Progress | **findings_direct_indirect.md**, related_work_fomin.md |
 | **Sprint 4B** | Analysis | ⏳ Upcoming | TBD |
 | **Sprint 5** | Write-up | ⏳ Final | TBD |
 
