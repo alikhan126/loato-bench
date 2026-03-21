@@ -125,25 +125,26 @@ uv run python scripts/download_artifacts.py --only data        # parquets + spli
 | `data/processed/` | ~16 MB | `labeled_v1.parquet` + `unified_dataset.parquet` |
 | `data/splits/` | ~6 MB | All 4 split index files + manifest |
 
-### What's in Git (LFS)
+### What's in Git
 
-Small-to-medium data files that are hard to reproduce (require API calls or represent the exact dataset):
+Only small metadata and config files are committed to the repo:
 
-| File | Why it's tracked |
-|------|------------------|
-| `data/processed/*.parquet` | The exact dataset all experiments run on |
-| `data/splits/*.json` | Exact fold assignments for reproducibility |
-| `data/labeling/llm_labels_raw.jsonl` | Audit trail — raw GPT-4o-mini responses for Tier 3 labeling |
+| File | Purpose |
+|------|---------|
 | `data/labeling/coverage_report.json` | Labeling coverage statistics |
+| `data/labeling/labeling_report.json` | Labeling pipeline summary |
 | `configs/final_categories.json` | Taxonomy v1.0 export (7 categories) |
 
-### What's NOT Tracked
+### What's NOT in Git (download from HF Hub)
 
-| Path | How to reproduce |
-|------|------------------|
+| Artifact | How to get it |
+|----------|---------------|
+| `data/processed/` | `uv run python scripts/download_artifacts.py --only data` |
+| `data/splits/` | `uv run python scripts/download_artifacts.py --only data` |
+| `data/labeling/llm_labels_raw.jsonl` | `uv run python scripts/download_artifacts.py --only data` |
+| `data/embeddings/` | `uv run python scripts/download_artifacts.py --only embeddings` |
+| `results/` | `uv run python scripts/download_artifacts.py --only results` |
 | `data/raw/` | `uv run loato-bench data download` |
-| `data/embeddings/` | `uv run python scripts/download_artifacts.py --only embeddings` or `uv run loato-bench embed run --all` |
-| `results/` | `uv run python scripts/download_artifacts.py --only results` or re-run experiments |
 | `.env` | Copy `.env.example` and fill in your keys |
 
 ### Attack Taxonomy (v1.0)
@@ -168,28 +169,25 @@ This was consolidated from an earlier 8-category draft: `context_manipulation` (
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) package manager
-- [Git LFS](https://git-lfs.com/) — required for data files tracked in the repo
 - Apple Silicon Mac (MPS backend) recommended, CPU works too
 
 ### Installation
 
 ```bash
-# 1. Install Git LFS (needed for parquet/split files in the repo)
-git lfs install
-
-# 2. Clone
+# 1. Clone
 git clone <repo-url>
 cd loato-bench
 
-# 3. Install Python dependencies
+# 2. Install Python dependencies
 uv sync
+
+# 3. Set up environment
+cp .env.example .env
+# Edit .env: add HF_TOKEN (required for artifact download)
+#            add OPENAI_API_KEY and WANDB_API_KEY (only if re-running pipelines)
 
 # 4. Download pre-computed artifacts (embeddings, results, data)
 uv run python scripts/download_artifacts.py
-
-# 5. Set up API keys (only needed if re-running embeddings or labeling)
-cp .env.example .env
-# Edit .env with your OPENAI_API_KEY and WANDB_API_KEY
 ```
 
 ### Special Installs
@@ -253,8 +251,7 @@ uv run pytest tests/ -v
 ```
 loato-bench/
 ├── pyproject.toml
-├── .gitattributes          # Git LFS tracking patterns (*.parquet, splits, etc.)
-├── .gitignore              # Broad /data/ ignore + selective negation rules
+├── .gitignore              # Data & results gitignored (hosted on HF Hub)
 ├── Justfile
 ├── configs/
 │   ├── data/               # sources.yaml, taxonomy.yaml (Tier 1+2 rules)
@@ -273,12 +270,12 @@ loato-bench/
 │   ├── analysis/           # EDA, visualization, SHAP, report generation
 │   ├── tracking/           # W&B integration
 │   └── utils/              # Config loading, device selection, reproducibility
-├── data/                   # Mostly gitignored — only specific files tracked
-│   ├── processed/          # ★ labeled_v1.parquet, unified_dataset.parquet (LFS)
-│   ├── splits/             # ★ 4 split index JSONs + integrity manifest (LFS)
-│   ├── labeling/           # ★ Audit trail: reports + raw LLM outputs (LFS + Git)
-│   ├── raw/                # (gitignored) downloaded source datasets
-│   └── embeddings/         # (gitignored) .npz embedding caches per model
+├── data/                   # Gitignored — download from HF Hub
+│   ├── processed/          # labeled_v1.parquet, unified_dataset.parquet
+│   ├── splits/             # Split index files + fold parquets
+│   ├── labeling/           # Audit trail: reports + raw LLM outputs
+│   ├── raw/                # Downloaded source datasets
+│   └── embeddings/         # .npz embedding caches per model
 ├── results/                # (gitignored) all experiment outputs
 ├── docs/                   # EDA guide, taxonomy spec, dataset docs, methodology notes
 ├── notebooks/              # Interactive analysis (EDA, embeddings, results)
@@ -286,7 +283,7 @@ loato-bench/
 └── tests/                  # pytest suite (712 tests, 90%+ coverage)
 ```
 
-★ = committed to repo for reproducibility/audit (large files via Git LFS, see above)
+All data files are hosted on [HF Hub](https://huggingface.co/datasets/alikhan126/loato-bench-artifacts) — run `uv run python scripts/download_artifacts.py` to get them.
 
 ## Experiment Matrix
 
@@ -349,7 +346,7 @@ loato-bench/
 - [x] **Sprint 0** — Scaffolding: ABCs, CLI, configs, CI pipeline
 - [x] **Sprint 1A** — Data pipeline + EDA: 5 dataset loaders, harmonization, quality gate, taxonomy Tiers 1+2, EDA with docs
 - [x] **Sprint 1B** — Embedding pipeline: 5 models implemented + cached, W&B integration
-- [x] **Sprint 2A** — Taxonomy finalization: Tier 3 LLM labeling (GPT-4o-mini), 7-category v1.0, split generation, data artifacts in Git LFS
+- [x] **Sprint 2A** — Taxonomy finalization: Tier 3 LLM labeling (GPT-4o-mini), 7-category v1.0, split generation, data artifacts on HF Hub
 - [x] **Sprint 2B** — Classifier implementations (LogReg, SVM, XGBoost, MLP) + training pipeline + benign dataset augmentation (4 new sources, 68.8K balanced samples)
 - [x] **Sprint 3** — Core experiments: Standard CV + LOATO across all 5 embeddings × 3 classifiers (30 runs complete)
 - [ ] **Sprint 4A** — Transfer experiments: direct→indirect, cross-lingual, LLM baseline
