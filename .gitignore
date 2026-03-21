@@ -10,22 +10,12 @@ wheels/
 # Virtual environments
 .venv/
 
-# Data & results (large / generated) — only top-level dirs
+# Data & results (large / generated) — hosted on HF Hub
 /data/
-!/data/processed/
-/data/processed/*
-!/data/processed/labeled_v1.parquet
-!/data/processed/unified_dataset.parquet
-!/data/splits/
 !/data/labeling/
 /data/labeling/*
 !/data/labeling/coverage_report.json
 !/data/labeling/labeling_report.json
-!/data/labeling/llm_labels_raw.jsonl
-!/data/review/
-/data/review/*
-!/data/review/error_rate_report.csv
-!/data/review/manual_overrides.csv
 /results/
 
 # Environment secrets
@@ -49,6 +39,9 @@ Thumbs.db
 
 # W&B
 wandb/
+
+# HF Hub download cache
+.hf_cache/
 
 # Coverage reports
 .coverage
