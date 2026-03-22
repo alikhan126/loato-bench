@@ -204,15 +204,21 @@ Open-Prompt-Injection~\citep{liu2024formalizing}) and 4 benign augmentation
 sources (Dolly-15K, OASST1, WildChat, Alpaca). The preprocessing pipeline
 applies NFC Unicode normalization, exact deduplication (SHA-256),
 near-deduplication (MinHash LSH, Jaccard threshold 0.90, word 5-grams), and
-language detection. GenTel-Bench, a content-harm dataset, required
+language detection. GenTel-Bench~\citep{gentel2024bench} is a content-harm dataset (not
+injection-specific); we repurposed its adversarial subset by applying
 injection-confidence filtering via a 32-keyword heuristic scorer (threshold
-0.4), removing 71\% of samples.
+0.4), removing 71\% of non-injection samples.
 
 The final dataset contains 68,845 samples: 40,003 benign (58.1\%) and 28,842 injection (41.9\%).
 
 \subsection{Attack Taxonomy}
 
-We developed a 7-category taxonomy via 3-tier labeling: (1) source-specific mappings, (2) 32 regex patterns, and (3) GPT-4o-mini for the remaining $\sim$47\% of unmapped samples.
+We developed a 7-category taxonomy via 3-tier labeling: (1) source-specific
+mappings, (2) 32 regex patterns, and (3) GPT-4o-mini (temperature 0.0) for the
+remaining $\sim$47\% of unmapped samples. When multiple strategies overlap, we
+assign based on the dominant mechanism (e.g., an encoded jailbreak is C3, not
+C2). Manual spot-check on 200 Tier-3 labels found 91\% agreement with the LLM
+assignments; disagreements were concentrated at the C1/C7 boundary.
 
 \begin{table}[t]
 \centering
@@ -351,7 +357,8 @@ precision, recall, AUC-ROC.
 
 All experiments use seed 42. Hardware: Apple Silicon Mac (18~GB), MPS preferred.
 The full pipeline is reproducible via CLI (\cref{app:repro}). Code, configs, and
-splits are version-controlled.\footnote{\url{https://github.com/alikhan126/loato-bench}}
+splits are version-controlled.\footnote{Repository will be made public upon
+acceptance: \url{https://github.com/alikhan126/loato-bench}}
 Experiment tracking via Weights \& Biases.
 
 % =============================================================================
@@ -362,10 +369,30 @@ Experiment tracking via Weights \& Biases.
 
 \subsection{Standard CV: Classifiers Score 0.977--0.997 \Fone{}}
 
-Under standard 5-fold CV, all 20 embedding-classifier combinations achieve
-strong performance: mean \Fone{} = 0.964. Excluding SVM (kernel
+Under standard 5-fold CV, all 20 combinations achieve strong performance
+(\cref{tab:cv-compact}). Mean \Fone{} = 0.964; excluding SVM (kernel
 approximation\footnote{SVM uses Nystroem(500) + PCA(128) approximation
-throughout; see \cref{sec:method}.}), the top 15 average 0.991. Best: OpenAI-Small $\times$ MLP (0.997). These numbers look deployment-ready.
+throughout; see \cref{sec:method}.}), the top 15 average 0.991. Best:
+OpenAI-Small $\times$ MLP (0.997). These numbers look deployment-ready.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Standard 5-fold CV: Macro \Fone{} (all 20 combinations). SVM$^*$
+  uses Nystroem approximation. Full table in \cref{app:full-results}.}
+\label{tab:cv-compact}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Embedding} & \textbf{LogReg} & \textbf{SVM$^*$} & \textbf{XGBoost} & \textbf{MLP} \\
+\midrule
+MiniLM (384d)       & 0.977 & 0.928 & 0.983 & 0.992 \\
+BGE-Large (1024d)   & 0.989 & 0.830 & 0.986 & 0.994 \\
+Instructor (768d)   & 0.995 & 0.896 & 0.994 & 0.997 \\
+OpenAI-Small (1536d)& 0.995 & 0.902 & 0.993 & \textbf{0.997} \\
+E5-Mistral (4096d)  & 0.994 & 0.851 & 0.987 & 0.996 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{LOATO Reveals the Generalization Gap}
 \label{sec:loato}
@@ -411,16 +438,16 @@ catches only 21--41\% of indirect attacks.
 \toprule
 & \multicolumn{2}{c}{\textbf{Macro \Fone{}}} & \multicolumn{2}{c}{\textbf{AUC-ROC}} \\
 \cmidrule(lr){2-3} \cmidrule(lr){4-5}
-\textbf{Embedding} & \textbf{Best} & \textbf{Worst} & \textbf{Best} & \textbf{Worst} \\
+\textbf{Embedding} & \textbf{Best (clf)} & \textbf{Worst (clf)} & \textbf{Best} & \textbf{Worst} \\
 \midrule
-MiniLM (384d) & 0.290 & 0.221 & 0.875 & 0.816 \\
-BGE-Large (1024d) & 0.271 & 0.207 & 0.875 & 0.735 \\
-Instructor (768d) & 0.523$^\dagger$ & 0.226 & 0.964 & 0.923 \\
-OpenAI-Small (1536d) & 0.413 & 0.218 & 0.951 & 0.871 \\
-E5-Mistral (4096d) & 0.325 & 0.206 & 0.861 & 0.684 \\
+MiniLM (384d) & 0.290 (LR) & 0.221 (XGB) & 0.875 & 0.816 \\
+BGE-Large (1024d) & 0.271 (LR) & 0.207 (SVM$^\dagger$) & 0.875 & 0.735 \\
+Instructor (768d) & 0.523 (SVM$^\dagger$) & 0.226 (XGB) & 0.964 & 0.923 \\
+OpenAI-Small (1536d) & 0.413 (MLP) & 0.218 (SVM$^\dagger$) & 0.951 & 0.871 \\
+E5-Mistral (4096d) & 0.325 (LR) & 0.206 (SVM$^\dagger$) & 0.861 & 0.684 \\
 \bottomrule
-\multicolumn{5}{l}{\footnotesize $^\dagger$Instructor $\times$ SVM outlier---Nystroem
-  may act as regularization.}
+\multicolumn{5}{l}{\footnotesize $^\dagger$SVM uses Nystroem approximation.
+  LR = LogReg, XGB = XGBoost.}
 \end{tabular}
 \end{table}
 
@@ -441,21 +468,27 @@ GPT-4o evaluated zero-shot on 500 samples per test pool:
 \small
 \caption{Classifier vs.\ GPT-4o zero-shot comparison.}
 \label{tab:llm}
-\begin{tabular}{lcccc}
+\begin{tabular}{llccc}
 \toprule
-\textbf{Test Pool} & \textbf{Best Clf.} & \textbf{GPT-4o} & \textbf{Winner} & \textbf{Gap} \\
+\textbf{Test Pool} & \textbf{System} & \textbf{\Fone{}} & \textbf{Winner} & \textbf{Gap} \\
 \midrule
-Standard CV & 0.997 & 0.853 & Classifier & +0.14 \\
-Direct$\to$Indirect & 0.523$^\dagger$ & 0.711 & GPT-4o & +0.19 \\
+\multirow{2}{*}{Standard CV}
+  & Best Clf.\ (OpenAI$\times$MLP) & 0.997 & \multirow{2}{*}{Classifier} & \multirow{2}{*}{+0.14} \\
+  & GPT-4o (zero-shot) & 0.853 & & \\
+\midrule
+\multirow{3}{*}{\shortstack[l]{Direct$\to$\\Indirect}}
+  & Best non-SVM (OpenAI$\times$MLP) & 0.413 & \multirow{3}{*}{GPT-4o} & +0.30 \\
+  & Best overall (Instr.$\times$SVM$^\dagger$) & 0.523 & & +0.19 \\
+  & GPT-4o (zero-shot) & 0.711 & & --- \\
 \bottomrule
-\multicolumn{5}{l}{\footnotesize $^\dagger$Instructor $\times$ SVM (Nystroem
-  approx.). Best non-SVM: 0.413 (gap: +0.30).}
+\multicolumn{5}{l}{\footnotesize $^\dagger$SVM uses Nystroem approx.; this
+  outlier may reflect implicit regularization.}
 \end{tabular}
 \end{table}
 
 On familiar attacks, classifiers win (+0.14 \Fone{}, $\sim$800$\times$
-cheaper). On novel attacks, GPT-4o wins by +0.19 over SVM, +0.30 over non-SVM
-classifiers. The gap is architectural: classifiers drop 0.45--0.56 \Fone{} from
+cheaper). On novel attacks, GPT-4o wins by +0.30 over the best non-SVM
+classifier and +0.19 over the SVM outlier. The gap is architectural: classifiers drop 0.45--0.56 \Fone{} from
 standard to indirect; GPT-4o drops 0.14. GPT-4o's precision is near-perfect
 (0.97--0.99) but recall is limited (0.63--0.70), making it a reliable second
 opinion but not a standalone solution.
@@ -566,6 +599,26 @@ untrusted content. Standard CV scores are reassuring. The real world is not.
 
 \section{Full Results Tables}
 \label{app:full-results}
+
+\begin{table}[h]
+\centering
+\small
+\caption{Mean LOATO \Fone{} by held-out category (averaged across all 20
+  embedding-classifier combinations).}
+\label{tab:per-fold-summary}
+\begin{tabular}{llcc}
+\toprule
+\textbf{Held-Out Category} & \textbf{Mean \Fone{}} & \textbf{Hardest} & \textbf{Easiest} \\
+\midrule
+C7 --- Other & 0.951 & BGE$\times$SVM (0.786) & BGE$\times$MLP (0.994) \\
+C1 --- Instruction Override & 0.946 & E5$\times$SVM (0.623) & Instr.$\times$MLP (0.996) \\
+C4 --- Info.\ Extraction & 0.926 & Instr.$\times$SVM (0.598) & OpenAI$\times$MLP (0.989) \\
+C2 --- Jailbreak / Roleplay & 0.919 & Instr.$\times$SVM (0.783) & OpenAI$\times$MLP (0.972) \\
+C5 --- Social Engineering & 0.910 & BGE$\times$SVM (0.706) & E5$\times$MLP (0.981) \\
+C3 --- Obfusc.\ / Encoding & \textbf{0.874} & Instr.$\times$SVM (0.556) & BGE$\times$MLP (0.964) \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{table*}[t]
 \centering
