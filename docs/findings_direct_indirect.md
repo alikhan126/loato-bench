@@ -37,7 +37,7 @@
 
 4. **XGBoost and SVM collapse**: XGBoost consistently collapses (~0.21 F1), and SVM is similarly poor (0.21–0.26) except for the instructor outlier. Both overfit to surface patterns.
 
-5. **AUC-ROC >> F1**: AUC ranges 0.68–0.96 while F1 is 0.21–0.52. Classifiers rank indirect injections somewhat correctly but decision thresholds are miscalibrated for the shifted distribution. This suggests threshold tuning or calibration could partially close the gap.
+5. **AUC-ROC >> F1**: AUC ranges 0.68–0.96 while F1 is 0.21–0.52. Classifiers rank indirect injections somewhat correctly but decision thresholds are miscalibrated for the shifted distribution. Threshold analysis (LOATO-4B-02, see `docs/findings_master.md` §6.4) confirms: oracle threshold recalibration improves mean F1 from 0.29 → 0.56, but still falls far short of in-distribution performance (0.96). The gap is fundamentally about representation, not calibration.
 
 6. **Instructor embedding stands out on AUC**: instructor × MLP achieves AUC-ROC 0.9635 despite F1=0.342, suggesting instruction-tuned embeddings capture injection semantics better but still can't cleanly separate at default threshold.
 
@@ -48,7 +48,7 @@ Fomin reports 7–37% detection rates for indirect injections on production guar
 ## Implications
 
 - **Deployment risk**: A classifier scoring 0.97 F1 on standard CV may score 0.21 on indirect injections — a deployment-critical blind spot
-- **Threshold recalibration**: High AUC with low F1 suggests post-hoc threshold tuning could help
+- **Threshold recalibration** (quantified in LOATO-4B-02): Oracle thresholds improve mean F1 from 0.29 → 0.56; 10% labeled holdout calibration recovers ~100% of oracle improvement. SVM benefits most (oracle F1 up to 0.88 for Instructor × SVM). See `docs/findings_master.md` §6.4
 - **LLM baseline confirms architectural gap**: GPT-4o scores 0.71 F1 on indirect injections (LOATO-4A-03) vs the best embedding classifier at 0.41 (0.52 with SVM outlier) — a +0.19–0.30 F1 advantage. The generalization failure is architectural (pattern matching vs reasoning), not data-driven. See `docs/findings_llm_baseline.md`
 
 ## Artifacts
@@ -56,5 +56,6 @@ Fomin reports 7–37% detection rates for indirect injections on production guar
 - 20 result JSONs: `results/experiments/direct_indirect_*.json`
 - W&B: runs tagged `transfer_type:direct_indirect` in `loato-bench` project
 - HF Hub: PR submitted to `alikhan126/loato-bench-artifacts`
+- Threshold analysis: `analysis/transfer_threshold_analysis.json`, `analysis/figures/transfer_*.{png,pdf}`
 - Citation: Fomin (2026) in `docs/references.bib`
 - Positioning: `docs/related_work_fomin.md`

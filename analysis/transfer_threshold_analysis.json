@@ -1,0 +1,231 @@
+{
+  "results": [
+    {
+      "Embedding": "MiniLM (384d)",
+      "Classifier": "LogReg",
+      "Uncalibrated_F1": 0.2902872198327189,
+      "Oracle_F1": 0.5917258906347528,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.590732304030004,
+      "AUC_ROC": 0.8337656689510933,
+      "AUC_PR": 0.9224019493805806,
+      "Score_Shift": -0.8406152652197585
+    },
+    {
+      "Embedding": "MiniLM (384d)",
+      "Classifier": "SVM",
+      "Uncalibrated_F1": 0.2646643445650219,
+      "Oracle_F1": 0.7905308783107021,
+      "Oracle_Threshold": 0.014924623115577889,
+      "Calibrated_F1": 0.7894632537369759,
+      "AUC_ROC": 0.8727355571645785,
+      "AUC_PR": 0.9357639479892038,
+      "Score_Shift": -0.737494552358972
+    },
+    {
+      "Embedding": "MiniLM (384d)",
+      "Classifier": "XGBoost",
+      "Uncalibrated_F1": 0.22071268570232241,
+      "Oracle_F1": 0.5704878540244304,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.5703397678516333,
+      "AUC_ROC": 0.8754462267277773,
+      "AUC_PR": 0.9376384745858266,
+      "Score_Shift": -0.9511783749048511
+    },
+    {
+      "Embedding": "MiniLM (384d)",
+      "Classifier": "MLP",
+      "Uncalibrated_F1": 0.24765836270381353,
+      "Oracle_F1": 0.3464292974017965,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.3464996685168438,
+      "AUC_ROC": 0.8161889450858496,
+      "AUC_PR": 0.9167654405477998,
+      "Score_Shift": -0.9517319001498231
+    },
+    {
+      "Embedding": "BGE-Large (1024d)",
+      "Classifier": "LogReg",
+      "Uncalibrated_F1": 0.2711440710680146,
+      "Oracle_F1": 0.3656876889490669,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.3641326971161429,
+      "AUC_ROC": 0.7578707028448923,
+      "AUC_PR": 0.8920365891757887,
+      "Score_Shift": -0.9244331091368677
+    },
+    {
+      "Embedding": "BGE-Large (1024d)",
+      "Classifier": "SVM",
+      "Uncalibrated_F1": 0.20707262775680582,
+      "Oracle_F1": 0.6141499567741877,
+      "Oracle_Threshold": 0.029698492462311557,
+      "Calibrated_F1": 0.6122709946304847,
+      "AUC_ROC": 0.735273015959045,
+      "AUC_PR": 0.8342545251414033,
+      "Score_Shift": -0.7784747771645681
+    },
+    {
+      "Embedding": "BGE-Large (1024d)",
+      "Classifier": "XGBoost",
+      "Uncalibrated_F1": 0.21429404970397575,
+      "Oracle_F1": 0.47279127093371753,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.4730504193527104,
+      "AUC_ROC": 0.8751107173354843,
+      "AUC_PR": 0.9386575916675901,
+      "Score_Shift": -0.9692008964137863
+    },
+    {
+      "Embedding": "BGE-Large (1024d)",
+      "Classifier": "MLP",
+      "Uncalibrated_F1": 0.26024093288027905,
+      "Oracle_F1": 0.3704564075876225,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.37025913784255016,
+      "AUC_ROC": 0.799381560524289,
+      "AUC_PR": 0.9096454613395827,
+      "Score_Shift": -0.9382910953287035
+    },
+    {
+      "Embedding": "Instructor (768d)",
+      "Classifier": "LogReg",
+      "Uncalibrated_F1": 0.31959546652432386,
+      "Oracle_F1": 0.5324927306269717,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.5323183835075551,
+      "AUC_ROC": 0.9365875297855103,
+      "AUC_PR": 0.9694433854834617,
+      "Score_Shift": -0.8675181168464929
+    },
+    {
+      "Embedding": "Instructor (768d)",
+      "Classifier": "SVM",
+      "Uncalibrated_F1": 0.52307817204299,
+      "Oracle_F1": 0.8822137815576074,
+      "Oracle_Threshold": 0.05432160804020101,
+      "Calibrated_F1": 0.8814704587807899,
+      "AUC_ROC": 0.922960319481033,
+      "AUC_PR": 0.9726147013919975,
+      "Score_Shift": -0.2983752860785515
+    },
+    {
+      "Embedding": "Instructor (768d)",
+      "Classifier": "XGBoost",
+      "Uncalibrated_F1": 0.226307777306602,
+      "Oracle_F1": 0.5653177476486115,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.5654621882191524,
+      "AUC_ROC": 0.9270337411792702,
+      "AUC_PR": 0.9619827719488487,
+      "Score_Shift": -0.9515154844561238
+    },
+    {
+      "Embedding": "Instructor (768d)",
+      "Classifier": "MLP",
+      "Uncalibrated_F1": 0.34219538754374634,
+      "Oracle_F1": 0.718726227510694,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.7184502697656518,
+      "AUC_ROC": 0.9634751699748545,
+      "AUC_PR": 0.9831574714147472,
+      "Score_Shift": -0.8245417427616865
+    },
+    {
+      "Embedding": "OpenAI-Small (1536d)",
+      "Classifier": "LogReg",
+      "Uncalibrated_F1": 0.4081432844357208,
+      "Oracle_F1": 0.5198143006436635,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.5187142221397734,
+      "AUC_ROC": 0.8712646429088786,
+      "AUC_PR": 0.9500103828201556,
+      "Score_Shift": -0.7844833921725587
+    },
+    {
+      "Embedding": "OpenAI-Small (1536d)",
+      "Classifier": "SVM",
+      "Uncalibrated_F1": 0.2179535744116022,
+      "Oracle_F1": 0.8328667878148364,
+      "Oracle_Threshold": 0.03462311557788945,
+      "Calibrated_F1": 0.8318944103591022,
+      "AUC_ROC": 0.8813968704874809,
+      "AUC_PR": 0.9399498646818658,
+      "Score_Shift": -0.7745561911592084
+    },
+    {
+      "Embedding": "OpenAI-Small (1536d)",
+      "Classifier": "XGBoost",
+      "Uncalibrated_F1": 0.22594948620359975,
+      "Oracle_F1": 0.5132612332206572,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.5135430475769627,
+      "AUC_ROC": 0.9033939904861644,
+      "AUC_PR": 0.9568513723084995,
+      "Score_Shift": -0.9561676147028857
+    },
+    {
+      "Embedding": "OpenAI-Small (1536d)",
+      "Classifier": "MLP",
+      "Uncalibrated_F1": 0.4129957484982393,
+      "Oracle_F1": 0.5521870399621798,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.5527888996434522,
+      "AUC_ROC": 0.9506671536299489,
+      "AUC_PR": 0.9801566906619521,
+      "Score_Shift": -0.7798249146636311
+    },
+    {
+      "Embedding": "E5-Mistral (4096d)",
+      "Classifier": "LogReg",
+      "Uncalibrated_F1": 0.3247957810362744,
+      "Oracle_F1": 0.4438774129699088,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.44320602594438097,
+      "AUC_ROC": 0.7971262403378365,
+      "AUC_PR": 0.9145049644885663,
+      "Score_Shift": -0.8759964574098323
+    },
+    {
+      "Embedding": "E5-Mistral (4096d)",
+      "Classifier": "SVM",
+      "Uncalibrated_F1": 0.2055759190640369,
+      "Oracle_F1": 0.6268036227216159,
+      "Oracle_Threshold": 0.12326633165829146,
+      "Calibrated_F1": 0.6248189008725238,
+      "AUC_ROC": 0.684215818404285,
+      "AUC_PR": 0.8143424322086166,
+      "Score_Shift": -0.2649956680509599
+    },
+    {
+      "Embedding": "E5-Mistral (4096d)",
+      "Classifier": "XGBoost",
+      "Uncalibrated_F1": 0.21115434866506017,
+      "Oracle_F1": 0.4159901580490789,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.4164208558795649,
+      "AUC_ROC": 0.7989910669471522,
+      "AUC_PR": 0.893870792020643,
+      "Score_Shift": -0.9736594375923948
+    },
+    {
+      "Embedding": "E5-Mistral (4096d)",
+      "Classifier": "MLP",
+      "Uncalibrated_F1": 0.2521214983663598,
+      "Oracle_F1": 0.3598846384369308,
+      "Oracle_Threshold": 0.01,
+      "Calibrated_F1": 0.3596055510282771,
+      "AUC_ROC": 0.8607614712610993,
+      "AUC_PR": 0.9360839532641972,
+      "Score_Shift": -0.9478247055567082
+    }
+  ],
+  "metadata": {
+    "n_combos": 20,
+    "cal_fraction": 0.1,
+    "n_thresholds": 200,
+    "train_size": 37944,
+    "test_size": 30901
+  }
+}
