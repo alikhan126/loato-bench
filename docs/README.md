@@ -165,7 +165,7 @@ Can embedding-based classifiers **generalize to novel attack types** they've nev
 | **Sprint 2B** | Classifiers | ✅ Complete | - |
 | **Sprint 3** | Experiments | ✅ Complete | - |
 | **Sprint 4A** | Transfer + SVM | ✅ Complete | **findings_direct_indirect.md**, related_work_fomin.md, findings_llm_baseline.md |
-| **Sprint 4B** | Analysis | ⏳ Upcoming | TBD |
+| **Sprint 4B** | Analysis | ⏳ In Progress | **findings_master.md** (§5–§6), 4B-01 tables + 4B-02 threshold analysis complete |
 | **Sprint 5** | Write-up | ⏳ Final | TBD |
 
 ---
