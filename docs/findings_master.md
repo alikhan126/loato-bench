@@ -193,6 +193,8 @@ All classifiers wrap sklearn pipelines with `StandardScaler` as the first step t
 | MLP | Multi-Layer Perceptron | hidden_layers=[256, 128], lr=0.001, max_iter=500, early_stopping=True |
 | SVM | SVM (RBF kernel) | C=1.0, kernel=rbf, gamma=scale. PCA(128) + Nystroem(500) approximation for tractability on 68K samples |
 
+**SVM methodology note**: Exact RBF-kernel SVM is O(n²–n³) in training time and requires the full n×n kernel matrix in memory. On 68K samples with `probability=True` (needed for AUC-ROC), a single fold exceeded 20+ minutes and was infeasible for the full experiment matrix (~55 runs). We use a two-step approximation: (1) PCA reduces embeddings from their native dimensionality to 128 components, and (2) Nystroem kernel approximation (500 components, RBF kernel) maps the reduced features into an approximate kernel space, followed by SGDClassifier (hinge loss) wrapped in CalibratedClassifierCV (3-fold) for probability estimates. This reduces training time from hours to ~1.3 seconds per fold. The approximation achieves lower absolute F1 (0.83–0.93 Standard CV) compared to other classifiers (0.97–0.99), so SVM results should be interpreted as a lower bound. For datasets with ≤10K samples, the classifier automatically uses exact SVC.
+
 ### 4.3 Evaluation Protocols
 
 #### 4.3.1 Standard 5-Fold Cross-Validation (Baseline)
@@ -348,7 +350,9 @@ Largest gap: Instructor × SVM (ΔF1 = 0.150). Smallest gap: BGE-Large × MLP (�
 
 4. **Instructor embedding stands out on AUC**: instructor × MLP achieves AUC-ROC 0.9635 despite F1=0.342. Instruction-tuned embeddings capture injection semantics better but still can't cleanly separate at the default threshold.
 
-5. **Consistent with Fomin (2026)**: Fomin reports 7–37% detection rates for indirect injections on production guardrails. Our 0.21–0.41 F1 range aligns with this but provides the first controlled measurement across 15 embedding-classifier combinations.
+5. **Consistent with Fomin (2026)**: Fomin reports 7–37% detection rates for indirect injections on production guardrails. Our 0.21–0.52 F1 range aligns with this but provides the first controlled measurement across 20 embedding-classifier combinations.
+
+6. **SVM follows the collapse pattern** with one outlier: instructor × SVM achieves F1=0.523 — the highest transfer F1 across all 20 combinations. The Nystroem approximation may act as implicit regularization. All other SVM combos score 0.21–0.26, consistent with XGBoost.
 
 ### 5.4 LLM Zero-Shot Baseline
 
@@ -363,16 +367,18 @@ GPT-4o evaluated zero-shot on 500 stratified samples per test pool:
 
 | Test Pool | GPT-4o F1 | Best Classifier F1 | Winner | Gap |
 |-----------|-----------|---------------------|--------|-----|
-| Standard CV | 0.8528 | ~0.97 | Classifiers | +0.12 |
-| Direct→Indirect | **0.7105** | 0.4130 | **GPT-4o** | **+0.30** |
+| Standard CV | 0.8528 | ~0.97 (MLP) | Classifiers | +0.12 |
+| Direct→Indirect | **0.7105** | 0.5231 (SVM†) / 0.4130 (MLP) | **GPT-4o** | **+0.19 / +0.30** |
+
+*†instructor × SVM outlier — see §5.3 observation #6.*
 
 **Key findings**:
 
 1. **On familiar attacks, classifiers win** — cheap, fast, and +0.12 F1 better than GPT-4o zero-shot. No reason to use an LLM when attack types match training data.
 
-2. **On novel attacks, GPT-4o wins by +0.30 F1** — reasoning about intent beats pattern matching when the surface patterns are unfamiliar.
+2. **On novel attacks, GPT-4o wins by +0.19–0.30 F1** — reasoning about intent beats pattern matching when the surface patterns are unfamiliar. Even the SVM outlier (0.52) still trails GPT-4o by 0.19.
 
-3. **The gap is architectural**: Classifiers drop 0.56 F1 (0.97 → 0.41) from standard to indirect. GPT-4o drops 0.14 (0.85 → 0.71). The LLM's degradation is **4x smaller**.
+3. **The gap is architectural**: Classifiers drop 0.45–0.56 F1 (0.97 → 0.41–0.52) from standard to indirect. GPT-4o drops 0.14 (0.85 → 0.71). The LLM's degradation is **3–4x smaller**.
 
 4. **GPT-4o precision is near-perfect** (0.97–0.99) — it almost never false-positives. Weakness is recall (0.63–0.70): it misses ~30% of attacks.
 
