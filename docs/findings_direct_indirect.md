@@ -47,9 +47,10 @@ Fomin reports 7–37% detection rates for indirect injections on production guar
 
 ## Implications
 
-- **Deployment risk**: A classifier scoring 0.97 F1 on standard CV may score 0.21 on indirect injections — a deployment-critical blind spot
+- **Deployment risk**: A classifier scoring 0.97 F1 on standard CV may score 0.21 on indirect injections — a deployment-critical blind spot. LOATO evaluation (§5.2) reveals the intermediate step: mean LOATO F1 = 0.91 (ΔF1 = 0.034–0.051), confirming generalization degrades even on held-out attack *categories* before collapsing entirely on indirect injections
 - **Threshold recalibration** (quantified in LOATO-4B-02): Oracle thresholds improve mean F1 from 0.29 → 0.56; 10% labeled holdout calibration recovers ~100% of oracle improvement. SVM benefits most (oracle F1 up to 0.88 for Instructor × SVM). See `docs/findings_master.md` §6.4
 - **LLM baseline confirms architectural gap**: GPT-4o scores 0.71 F1 on indirect injections (LOATO-4A-03) vs the best embedding classifier at 0.41 (0.52 with SVM outlier) — a +0.19–0.30 F1 advantage. The generalization failure is architectural (pattern matching vs reasoning), not data-driven. See `docs/findings_llm_baseline.md`
+- **Cost-performance tradeoff**: The ~800x cost gap between classifier (~$0/query) and GPT-4o ($0.0008/query) motivates a layered defense. At 10% escalation rate, cost is $0.08/1K queries (80x cheaper than LLM-only) with +0.019 F1 gain on novel attacks. See `docs/findings_master.md` §5.5 for the full regime map
 
 ## Artifacts
 

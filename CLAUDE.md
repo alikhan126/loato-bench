@@ -182,7 +182,7 @@ Stats: bootstrap 95% CIs (10K resamples), McNemar, Friedman + Nemenyi, Cohen's d
 - [x] Sprint 2B: Classifier implementations + training pipeline + balanced dataset (68.8K samples)
 - [x] Sprint 3: Core experiments (Standard CV + LOATO) — 5 embeddings × 3 classifiers (30 runs)
 - [x] Sprint 4A: Transfer experiments (direct→indirect), SVM (with PCA + Nystroem), LLM baseline — 5 emb × 4 clf × 3 experiments (60 runs)
-- [ ] Sprint 4B: Analysis & visualization — 4B-01 core tables done, 4B-02 threshold analysis done, 4B-03/04 pending (UMAP, SHAP, final report)
+- [ ] Sprint 4B: Analysis & visualization — 4B-01 core tables done, 4B-02 threshold analysis done, 4B-03 cost-performance done, 4B-04 pending (UMAP, SHAP, final report)
 - [ ] Sprint 5: Integration + write-up
 
 ## EDA (Sprint 1A) — Key Points for Future Work
