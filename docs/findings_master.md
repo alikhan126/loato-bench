@@ -10,7 +10,7 @@ MS Data Science, Pace University
 
 ## Abstract
 
-Embedding-based prompt injection classifiers achieve 0.977–0.997 F1 under standard cross-validation, suggesting deployment readiness. However, standard CV guarantees every attack type appears in training — a condition violated in real deployments where novel attack techniques emerge continuously. We introduce LOATO-Bench (Leave-One-Attack-Type-Out Benchmark), an evaluation framework that holds out entire attack categories during training to measure cross-attack generalization. Using a unified dataset of 68,845 samples from 9 public sources, harmonized into a 7-category taxonomy, we evaluate 5 embedding models × 4 classifiers under three protocols: standard 5-fold CV, LOATO, and direct-to-indirect transfer. LOATO reveals a mean generalization gap of ΔF1 = 0.034 across the top 15 combinations (ΔF1 = 0.051 across all 20), with obfuscation/encoding attacks causing the largest drops (F1 = 0.874 when held out). More critically, classifiers scoring 0.997 F1 under standard CV collapse to 0.21–0.41 F1 when tested on indirect injections unseen during training. A GPT-4o zero-shot baseline scores 0.71 F1 on the same indirect test set — a +0.30 advantage requiring no training — confirming the generalization failure is architectural. We argue that standard CV is insufficient for evaluating prompt injection classifiers intended for production deployment, and that LOATO-style evaluation should become standard practice.
+Embedding-based prompt injection classifiers achieve 0.977–0.997 F1 under standard cross-validation, suggesting deployment readiness. However, standard CV guarantees every attack type appears in training — a condition violated in real deployments where novel attack techniques emerge continuously. We introduce LOATO-Bench (Leave-One-Attack-Type-Out Benchmark), an evaluation framework that holds out entire attack categories during training to measure cross-attack generalization. Using a unified dataset of 68,845 samples from 9 public sources, harmonized into a 7-category taxonomy, we evaluate 5 embedding models × 4 classifiers under three protocols: standard 5-fold CV, LOATO, and direct-to-indirect transfer. LOATO reveals a mean generalization gap of ΔF1 = 0.051 across all 20 embedding-classifier combinations (ΔF1 = 0.034 for the top 15, excluding SVM's kernel approximation), with obfuscation/encoding attacks causing the largest drops (F1 = 0.874 when held out). More critically, classifiers scoring 0.997 F1 under standard CV collapse to 0.21–0.41 F1 when tested on indirect injections unseen during training. A GPT-4o zero-shot baseline scores 0.71 F1 on the same indirect test set — a +0.30 advantage requiring no training — confirming the generalization failure is architectural. We argue that standard CV is insufficient for evaluating prompt injection classifiers intended for production deployment, and that LOATO-style evaluation should become standard practice.
 
 **Keywords**: prompt injection, adversarial attacks, embedding classifiers, evaluation methodology, generalization, LLM security
 
@@ -45,6 +45,11 @@ We conducted a live demonstration (Appendix A) showing that Claude Sonnet and GP
 ### 1.4 Novelty
 
 Prior work evaluates prompt injection classifiers using standard CV or dataset-level holdout (Fomin, 2026). No existing benchmark systematically holds out *attack categories* to test whether classifiers generalize across technique boundaries. LOATO-Bench fills this gap and demonstrates that the standard evaluation paradigm dramatically overstates deployment safety.
+
+**Figure 1** summarizes the core finding: the best embedding classifier (OpenAI-Small × MLP) scores 0.997 F1 under standard CV but collapses to 0.413 on indirect injections — a 58% drop. GPT-4o zero-shot scores 0.711 on the same test set with no training.
+
+![The Generalization Gap](../results/analysis/figures/generalization_gap_summary.png)
+*Figure 1: The generalization gap. OpenAI-Small × MLP under three evaluation protocols, with GPT-4o zero-shot comparison on the transfer test. Standard CV dramatically overstates deployment safety.*
 
 ---
 
@@ -200,7 +205,7 @@ We quantify this via **template homogeneity score**: for each LOATO fold, we com
 | C4 — Information Extraction | 0.675 | 0.051 | Low; extraction-specific vocabulary not shared with other categories |
 | C5 — Social Engineering | 0.674 | 0.065 | Low; emotional manipulation language distinct from technical injection patterns |
 
-Linear regression yields r = −0.604 (R² = 0.365, p = 0.28). The negative correlation supports the hypothesis: categories with higher template homogeneity exhibit smaller generalization gaps. The p-value reflects low statistical power with n = 5 data points, not absence of signal — the direction and magnitude are consistent, and the effect is mechanistically interpretable.
+Linear regression yields r = −0.604 (R² = 0.365, p = 0.28). With only 5 LOATO-eligible categories, this regression lacks statistical power, but the direction is consistent with the mechanistic hypothesis: categories with higher template homogeneity exhibit smaller generalization gaps. The p-value reflects n = 5, not absence of signal — the effect is mechanistically interpretable and the direction is robust.
 
 **Inter-category centroid distances** (cosine distance on MiniLM centroids, injection samples only) reveal that C1 and C7 (Other) are nearest neighbors (distance = 0.029), explaining why C7 is easy to classify even when held out — it shares substantial signal with the dominant C1 category. C3 (Obfuscation) is most distant from C5 (distance = 0.441) and C7 (distance = 0.423), confirming its structural uniqueness.
 
@@ -261,7 +266,17 @@ For each of the 5 eligible categories (C1–C5), we hold out the entire category
 
 #### 4.3.3 Direct→Indirect Transfer
 
-Train exclusively on direct injections (explicit commands like "ignore previous instructions"), test on indirect injections (malicious instructions embedded in retrieved context, tool outputs, or documents). This simulates the most deployment-critical scenario: RAG pipelines where injections arrive via external data, not user input.
+Train exclusively on direct injections, test on indirect injections. This simulates the most deployment-critical scenario: RAG pipelines where injections arrive via external data, not user input.
+
+**Operationalization.** The `is_indirect` field on each sample distinguishes the two pools. Only Open-Prompt-Injection contributes indirect samples — each row in the source dataset pairs a benign document with an injected variant, and both are flagged `is_indirect=True`. All other injection datasets (Deepset, HackAPrompt, GenTel-Bench, PINT/Gandalf) contribute only direct injections (`is_indirect=False`). Benign samples are split 80/20 between train and test (stratified, seed=42).
+
+| Split | Benign | Direct Injection | Indirect Injection | Total |
+|-------|--------|------------------|-------------------|-------|
+| Train | 32,014 | 5,930 | 0 | **37,944** |
+| Test | 8,003 | 0 | 22,898 | **30,901** |
+| **Total** | **40,017** | **5,930** | **22,898** | **68,845** |
+
+The train set contains all 5,930 direct injections and 80% of benign samples. The test set contains all 22,898 indirect injections and the remaining 20% of benign samples. No indirect injections appear during training — the classifier has never seen the attack surface it is evaluated on.
 
 #### 4.3.4 LLM Zero-Shot Baseline
 
@@ -509,7 +524,7 @@ If ΔF1 ≈ 0, it could mean the model is genuinely robust *or* that attack cate
 
 4. **Contamination check** — Lexical (Jaccard) + semantic (cosine) contamination between train/test splits, verified to be minimal (Sprint 2A-05).
 
-5. **Template homogeneity correlation** (§3.5, COMPLETE) — Template homogeneity score correlates negatively with ΔF1 (r = −0.604, R² = 0.365), confirming that the generalization gap is driven by structural category differences, not evaluation artifacts. UMAP projection visualizes the category separation in embedding space.
+5. **Template homogeneity correlation** (§3.5, COMPLETE) — Template homogeneity score correlates negatively with ΔF1 (r = −0.604, R² = 0.365). With only 5 LOATO-eligible categories this regression lacks statistical power, but the direction is consistent with the mechanistic hypothesis that the generalization gap is driven by structural category differences, not evaluation artifacts. The UMAP projection (Figure 3.5) visualizes the category separation in embedding space.
 
 ---
 
@@ -527,9 +542,9 @@ If ΔF1 ≈ 0, it could mean the model is genuinely robust *or* that attack cate
 
 6. **No fine-tuned LLM comparison** — We compare zero-shot LLM vs trained classifier. A fair comparison would also include a fine-tuned LLM, but this was outside scope and budget.
 
-8. **Only 3/15 LOATO gaps are statistically significant** — With only 5–6 folds per LOATO experiment, paired t-tests have low power. The gaps are consistent in direction (always positive) but most p-values fall in 0.06–0.15. Bootstrap CIs or more folds would strengthen significance claims.
+7. **Only 3/15 LOATO gaps are statistically significant** — With only 5–6 folds per LOATO experiment, paired t-tests have low power. The gaps are consistent in direction (always positive) but most p-values fall in 0.06–0.15. Bootstrap CIs or more folds would strengthen significance claims.
 
-9. **Category size imbalance** — C1 (Instruction Override) has 19,161 samples while C5 (Social Engineering) has only 311. Smaller categories have noisier estimates.
+8. **Category size imbalance** — C1 (Instruction Override) has 19,161 samples while C5 (Social Engineering) has only 311. Smaller categories have noisier estimates.
 
 ---
 
