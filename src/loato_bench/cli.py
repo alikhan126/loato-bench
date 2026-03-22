@@ -1216,6 +1216,53 @@ def transfer_threshold(
         console.print(f"  {name}: {path}")
 
 
+@analyze_app.command("cost-performance")
+def cost_performance(
+    results_dir: str = typer.Option(
+        "results/experiments",
+        help="Directory containing experiment result JSONs.",
+    ),
+    llm_results: str = typer.Option(
+        "results/llm_baseline/llm_baseline_gpt_4o_all.json",
+        help="Path to LLM baseline results JSON.",
+    ),
+    output_dir: str = typer.Option(
+        "results/analysis",
+        help="Output directory for tables, figures, and summary.",
+    ),
+    dpi: int = typer.Option(150, help="DPI for saved figures."),
+) -> None:
+    """Cost-performance analysis: classifier vs GPT-4o regime map."""
+    from loato_bench.analysis.cost_performance import run_cost_performance_analysis
+    from loato_bench.utils.config import PROJECT_ROOT
+
+    res_path = PROJECT_ROOT / results_dir
+    llm_path = PROJECT_ROOT / llm_results
+    out_path = PROJECT_ROOT / output_dir
+
+    # Check for threshold results (optional)
+    _threshold_candidate = PROJECT_ROOT / "analysis" / "transfer_threshold_analysis.json"
+    threshold_path = _threshold_candidate if _threshold_candidate.exists() else None
+
+    console.print("[bold green]Running cost-performance analysis...[/bold green]")
+
+    outputs = run_cost_performance_analysis(
+        results_dir=res_path,
+        llm_results_path=llm_path,
+        output_dir=out_path,
+        threshold_results_path=threshold_path,
+        dpi=dpi,
+    )
+
+    if not outputs:
+        console.print("[yellow]No results produced.[/yellow]")
+        return
+
+    console.print(f"\n[bold green]Generated {len(outputs)} outputs:[/bold green]")
+    for name, path in outputs.items():
+        console.print(f"  {name}: {path}")
+
+
 # ---------------------------------------------------------------------------
 # Entrypoint for pyproject.toml [project.scripts]
 # ---------------------------------------------------------------------------
