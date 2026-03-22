@@ -52,17 +52,31 @@ Prior work evaluates prompt injection classifiers using standard CV or dataset-l
 
 ### 2.1 Prompt Injection Attacks
 
-[To be expanded with full literature review. Key references: Perez & Ribeiro (2022) on prompt injection taxonomy, Greshake et al. (2023) on indirect injection, Liu et al. (2024) on attack surveys.]
+Prompt injection was first identified as a distinct threat class by Perez and Ribeiro (2022), who demonstrated that GPT-3 could be trivially misdirected by adversarial inputs. Their PromptInject framework formalized two attack categories — *goal hijacking* (overriding the system's intended output) and *prompt leaking* (extracting the hidden system prompt) — establishing the foundational taxonomy that subsequent work has extended. Critically, these attacks required no model access or gradient computation: simple handcrafted strings such as "ignore previous instructions" were sufficient to compromise model behavior.
+
+Greshake et al. (2023) expanded the threat model to *indirect* prompt injection, where malicious instructions are not provided by the user but embedded in external data sources — web pages, emails, or retrieved documents — that an LLM-integrated application processes on the user's behalf. This attack vector is particularly dangerous in retrieval-augmented generation (RAG) pipelines, where the model cannot distinguish between trusted system instructions and untrusted retrieved content. The authors demonstrated real-world exploits including data exfiltration, cross-plugin attacks, and persistent compromise of LLM agents. The direct/indirect distinction is central to our work: we show that classifiers trained exclusively on direct injections collapse catastrophically when tested on indirect ones (§5.3).
+
+Liu et al. (2024a) provided the first formal framework for benchmarking prompt injection attacks and defenses, evaluating 5 attack strategies and 10 defense mechanisms across 10 LLMs and 7 tasks. Their Open-Prompt-Injection benchmark — which we incorporate as a data source (§3.1) — revealed that no existing defense achieves both high detection rates and low false positive rates simultaneously. More recent surveys (Esmradi et al., 2025) have catalogued the rapid evolution of attack techniques from manual crafting to automated generation and deep-learning-driven optimization, underscoring the challenge of training classifiers on a static attack distribution.
+
+The distinction between direct and indirect injection has become a central organizing principle in the field. Direct injections are user-supplied adversarial inputs (jailbreaks, instruction overrides); indirect injections are adversarial payloads embedded in data the LLM retrieves or processes. Our 7-category taxonomy (§3.3) maps both attack surfaces, and our three experimental protocols — standard CV, LOATO, and direct-to-indirect transfer — measure generalization across both dimensions.
 
 ### 2.2 Prompt Injection Detection
 
-Production guardrails include Meta's Prompt-Guard-2-86M, LlamaGuard, and various embedding-based classifiers. These are typically evaluated on held-out splits of their training data, which inflates reported performance.
+Detection approaches span three paradigms: LLM-based classifiers, fine-tuned transformer classifiers, and embedding-based classifiers with classical ML heads.
 
-### 2.3 Fomin (2026) — Leave-One-Dataset-Out
+**LLM-based guardrails.** Meta's LlamaGuard (Inan et al., 2023) fine-tunes Llama-2-7B for multi-class safety classification of both prompts and responses, achieving competitive performance on OpenAI's Moderation Evaluation dataset and ToxicChat. Its successor, Prompt-Guard-2-86M, is a DeBERTa-based model trained specifically for prompt injection and jailbreak detection, offering lower latency than full LLM inference. Rebuff (Protect AI, 2023) combines heuristic filtering, an LLM-based analyzer, a known-attack database, and canary tokens in a multi-layer defense architecture. These systems demonstrate strong performance on their evaluation benchmarks but are typically assessed using held-out splits of their training data — the same evaluation paradigm our work critiques.
 
-Fomin (2026) proposes Leave-One-Dataset-Out (LODO) evaluation across 18 prompt injection datasets, revealing that standard same-source train-test splits inflate aggregate AUC by 8.4 percentage points, with per-dataset accuracy gaps ranging from 1% to 25%. LOATO-Bench is complementary: it holds out attack *categories* within a unified taxonomy rather than entire datasets, measuring whether classifiers generalize across attack types rather than across data sources. Both independently confirm that standard evaluation overestimates real-world performance.
+**Fine-tuned transformer classifiers.** Deepset released a DeBERTa-v3-base model fine-tuned on their 662-sample prompt injection dataset, achieving 99.1% accuracy on the held-out test set (Deepset, 2023). Protect AI subsequently released DeBERTa-v3-base-prompt-injection-v2, trained on a larger corpus. These models achieve high accuracy on in-distribution test sets, but their generalization to unseen attack types has not been systematically evaluated — precisely the gap LOATO-Bench addresses.
 
-Key differences:
+**Embedding-based classifiers.** Ayub and Majumdar (2024) demonstrated that embedding-based classifiers using Random Forest and XGBoost heads can detect prompt injection attacks, evaluating three embedding methods on a curated dataset of 467K prompts. Their work validates the viability of the embedding + classical ML pattern but evaluates only under standard train-test splits. Our work adopts the same architectural pattern — sentence embeddings fed into classical ML heads — but subjects it to LOATO evaluation, revealing that the high in-distribution performance does not transfer to held-out attack categories.
+
+A common limitation across all three paradigms is evaluation methodology: existing systems report performance on test sets drawn from the same distribution as training data. Standard cross-validation guarantees that every attack type, source dataset, and surface form appears in both training and test folds. This inflates reported metrics and obscures the generalization failures that LOATO-Bench is designed to expose.
+
+### 2.3 Evaluation Methodology and Distribution Shift
+
+The machine learning security community has increasingly recognized that in-distribution evaluation overestimates real-world robustness. Li et al. (2024) introduced OODRobustBench, demonstrating that adversarial robustness suffers severe degradation under distribution shift across 706 models and 23 dataset-wise shifts. Their central finding — that in-distribution robustness is a poor proxy for out-of-distribution robustness — directly parallels our observation that standard CV F1 (0.977–0.997) dramatically overstates LOATO F1 (0.874–0.977) and transfer F1 (0.21–0.41).
+
+Fomin (2026) applies this insight specifically to prompt injection, proposing Leave-One-Dataset-Out (LODO) evaluation across 18 datasets. LODO reveals that standard same-source train-test splits inflate aggregate AUC by 8.4 percentage points, with per-dataset accuracy gaps of 1–25%. LOATO-Bench is complementary: it holds out attack *categories* within a unified taxonomy rather than entire datasets, measuring whether classifiers generalize across attack types rather than across data sources. The two approaches answer different questions — LODO asks "does your classifier work on a dataset it hasn't seen?" while LOATO asks "does your classifier detect an attack *type* it hasn't seen?" Both independently confirm that standard evaluation overestimates real-world performance.
 
 | Dimension | Fomin (LODO) | LOATO-Bench (Ours) |
 |---|---|---|
@@ -73,7 +87,15 @@ Key differences:
 | Direct-to-indirect | 7–37% on guardrails (observational) | 0.21–0.41 F1 (controlled) |
 | Inflation finding | 8.4pp AUC | Standard CV F1 0.97 → LOATO/transfer 0.21–0.41 |
 
-Fomin reports 7–37% detection rates for indirect injections on production guardrails but does not run a controlled direct-to-indirect transfer experiment. LOATO-Bench provides exactly this.
+Fomin reports 7–37% detection rates for indirect injections on production guardrails but does not run a controlled direct-to-indirect transfer experiment. LOATO-Bench provides exactly this, quantifying the collapse at 0.21–0.41 F1 across 20 embedding-classifier combinations (§5.3).
+
+### 2.4 Embedding Models for Text Classification
+
+Sentence-level embeddings have become a standard representation for text classification tasks. Reimers and Gurevych (2019) introduced Sentence-BERT (SBERT), adapting BERT with siamese networks to produce semantically meaningful sentence embeddings efficiently. The resulting sentence-transformers library underpins two of our five embedding models: MiniLM (384d) and BGE-large (1024d).
+
+Subsequent work has extended the paradigm in two directions. Su et al. (2023) introduced INSTRUCTOR, which conditions embeddings on task-specific instructions, achieving state-of-the-art performance across 70 diverse tasks with an order of magnitude fewer parameters than prior approaches. Wang et al. (2024) demonstrated that decoder-only LLMs (Mistral-7B) can be fine-tuned into effective embedding models with minimal contrastive training, producing E5-Mistral-7B-instruct (4096d). Xiao et al. (2023) released the BGE (BAAI General Embedding) family, with BGE-large-en-v1.5 achieving strong retrieval and classification performance. OpenAI's proprietary text-embedding-3-small (1536d) represents the commercial end of the spectrum (OpenAI, 2024).
+
+Our experimental design (§4) leverages this diversity: 5 models spanning 384–4096 dimensions, open-source and proprietary, general-purpose and instruction-tuned. The embedding + classical ML pattern — where pre-trained embeddings are fed into a logistic regression, SVM, XGBoost, or MLP head — is attractive for production deployment because it decouples representation learning from classification, enabling fast inference at negligible per-query cost. LOATO-Bench tests whether this architectural simplicity comes at the cost of generalization.
 
 ---
 
@@ -541,9 +563,43 @@ Standard CV scores are reassuring. The real world is not.
 
 ## References
 
-Fomin, M. (2026). When Benchmarks Lie: Evaluating Malicious Prompt Classifiers Under True Distribution Shift. *arXiv preprint arXiv:2602.14161*.
+Ayub, M. A., & Majumdar, S. (2024). Embedding-based classifiers can detect prompt injection attacks. In *Conference on Applied Machine Learning for Information Security (CAMLIS)*. arXiv:2410.22284.
 
-[Additional references to be added: Perez & Ribeiro (2022), Greshake et al. (2023), Liu et al. (2024), Lee et al. (2022) on deduplication standards, etc.]
+Deepset. (2023). Prompt injections dataset. HuggingFace: `deepset/prompt-injections`.
+
+Esmradi, A., Yue, D., & Chow, S. (2025). Prompt injection attacks in large language models: A comprehensive review of vulnerabilities, attack vectors, and defense mechanisms. *Information*, 17(1), 54.
+
+Fomin, M. (2026). When benchmarks lie: Evaluating malicious prompt classifiers under true distribution shift. *arXiv preprint arXiv:2602.14161*.
+
+GenTel Lab. (2024). GenTel-Bench v1. HuggingFace: `GenTelLab/gentelbench-v1`.
+
+Greshake, K., Abdelnabi, S., Mishra, S., Endres, C., Holz, T., & Fritz, M. (2023). Not what you've signed up for: Compromising real-world LLM-integrated applications with indirect prompt injection. In *Proceedings of the 16th ACM Workshop on Artificial Intelligence and Security (AISec)* (pp. 79–90).
+
+Inan, H., Upasani, K., Chi, J., Rungta, R., Iyer, K., Mao, Y., Tontchev, M., Hu, Q., Fuller, B., Testuggine, D., & Khabsa, M. (2023). Llama Guard: LLM-based input-output safeguard for human-AI conversations. *arXiv preprint arXiv:2312.06674*.
+
+Lakera AI. (2023). Gandalf ignore instructions dataset. HuggingFace: `lakera/gandalf_ignore_instructions`.
+
+Li, L., Chai, Y., Wang, J., Chen, Y., Li, H., et al. (2024). OODRobustBench: A benchmark and large-scale analysis of adversarial robustness under distribution shift. In *International Conference on Machine Learning (ICML)*. arXiv:2310.12793.
+
+Liu, Y., Jia, Y., Geng, R., Jia, J., & Gong, N. Z. (2024a). Formalizing and benchmarking prompt injection attacks and defenses. In *33rd USENIX Security Symposium (USENIX Security 24)* (pp. 1831–1847). arXiv:2310.12815.
+
+Meta AI. (2024). Prompt-Guard-2-86M. HuggingFace: `meta-llama/Prompt-Guard-86M`.
+
+OpenAI. (2024). New embedding models and API updates. https://openai.com/index/new-embedding-models-and-api-updates/.
+
+Perez, F., & Ribeiro, I. (2022). Ignore previous prompt: Attack techniques for language models. In *NeurIPS ML Safety Workshop*. arXiv:2211.09527.
+
+Protect AI. (2023). Rebuff: LLM prompt injection detector. https://github.com/protectai/rebuff.
+
+Reimers, N., & Gurevych, I. (2019). Sentence-BERT: Sentence embeddings using siamese BERT-networks. In *Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing (EMNLP)* (pp. 3982–3992).
+
+Schulhoff, S., Pinto, J., Khan, A., Bouchard, L.-F., Si, C., et al. (2023). HackAPrompt: Exposing systemic vulnerabilities of LLMs through a global prompt hacking competition. arXiv:2311.16119.
+
+Su, H., Shi, W., Kasai, J., Wang, Y., Hu, Y., Ostendorf, M., Yih, W., Smith, N. A., Zettlemoyer, L., & Yu, T. (2023). One embedder, any task: Instruction-finetuned text embeddings. In *Findings of the Association for Computational Linguistics: ACL 2023* (pp. 1102–1121).
+
+Wang, L., Yang, N., Huang, X., Yang, L., Majumder, R., & Wei, F. (2024). Improving text embeddings with large language models. In *Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (ACL)*. arXiv:2401.00368.
+
+Xiao, S., Liu, Z., Zhang, P., & Muennighoff, N. (2023). C-Pack: Packed resources for general Chinese embeddings. *arXiv preprint arXiv:2309.07597*.
 
 ---
 

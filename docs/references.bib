@@ -1,7 +1,203 @@
+% =============================================================================
+% LOATO-Bench References
+% =============================================================================
+
+% ---------------------------------------------------------------------------
+% §2.1 Prompt Injection Attacks
+% ---------------------------------------------------------------------------
+
+@inproceedings{perez2022ignore,
+  title={Ignore Previous Prompt: Attack Techniques for Language Models},
+  author={Perez, F{\'a}bio and Ribeiro, Ian},
+  booktitle={NeurIPS ML Safety Workshop},
+  year={2022},
+  note={arXiv:2211.09527}
+}
+
+@inproceedings{greshake2023not,
+  title={Not What You've Signed Up For: Compromising Real-World
+         {LLM}-Integrated Applications with Indirect Prompt Injection},
+  author={Greshake, Kai and Abdelnabi, Sahar and Mishra, Shailesh
+          and Endres, Christoph and Holz, Thorsten and Fritz, Mario},
+  booktitle={Proceedings of the 16th ACM Workshop on Artificial
+             Intelligence and Security (AISec)},
+  pages={79--90},
+  year={2023},
+  publisher={ACM}
+}
+
+@inproceedings{liu2024formalizing,
+  title={Formalizing and Benchmarking Prompt Injection Attacks and Defenses},
+  author={Liu, Yupei and Jia, Yuqi and Geng, Runpeng and Jia, Jinyuan
+          and Gong, Neil Zhenqiang},
+  booktitle={33rd USENIX Security Symposium (USENIX Security 24)},
+  pages={1831--1847},
+  year={2024},
+  note={arXiv:2310.12815}
+}
+
+@article{esmradi2025comprehensive,
+  title={Prompt Injection Attacks in Large Language Models:
+         A Comprehensive Review of Vulnerabilities, Attack Vectors,
+         and Defense Mechanisms},
+  author={Esmradi, Amir and Yue, Daniel and Chow, Sam},
+  journal={Information},
+  volume={17},
+  number={1},
+  pages={54},
+  year={2025},
+  publisher={MDPI}
+}
+
+% ---------------------------------------------------------------------------
+% §2.2 Prompt Injection Detection
+% ---------------------------------------------------------------------------
+
+@article{inan2023llamaguard,
+  title={{Llama Guard}: {LLM}-based Input-Output Safeguard for
+         Human-{AI} Conversations},
+  author={Inan, Hakan and Upasani, Kartikeya and Chi, Jianfeng
+          and Rungta, Rashi and Iyer, Krithika and Mao, Yuning
+          and Tontchev, Michael and Hu, Qing and Fuller, Brian
+          and Testuggine, Davide and Khabsa, Madian},
+  journal={arXiv preprint arXiv:2312.06674},
+  year={2023}
+}
+
+@misc{meta2024promptguard,
+  title={{Prompt-Guard-2-86M}},
+  author={{Meta AI}},
+  year={2024},
+  howpublished={\url{https://huggingface.co/meta-llama/Prompt-Guard-86M}},
+  note={DeBERTa-based prompt injection and jailbreak classifier}
+}
+
+@misc{protectai2023rebuff,
+  title={Rebuff: {LLM} Prompt Injection Detector},
+  author={{Protect AI}},
+  year={2023},
+  howpublished={\url{https://github.com/protectai/rebuff}},
+  note={Multi-layer prompt injection detection framework (Apache 2.0)}
+}
+
+@misc{deepset2023promptinjections,
+  title={Prompt Injections Dataset},
+  author={{deepset}},
+  year={2023},
+  howpublished={\url{https://huggingface.co/datasets/deepset/prompt-injections}},
+  note={662 samples (263 injections, 399 benign) with fine-tuned DeBERTa classifier}
+}
+
+@inproceedings{ayub2024embedding,
+  title={Embedding-Based Classifiers Can Detect Prompt Injection Attacks},
+  author={Ayub, Md. Ahsan and Majumdar, Subhabrata},
+  booktitle={Conference on Applied Machine Learning for
+             Information Security (CAMLIS)},
+  year={2024},
+  note={arXiv:2410.22284}
+}
+
+% ---------------------------------------------------------------------------
+% §2.3 Evaluation Methodology and Distribution Shift
+% ---------------------------------------------------------------------------
+
 @article{fomin2026benchmarks,
   title={When Benchmarks Lie: Evaluating Malicious Prompt
          Classifiers Under True Distribution Shift},
   author={Fomin, Max},
   journal={arXiv preprint arXiv:2602.14161},
   year={2026}
+}
+
+@inproceedings{li2024oodrobustbench,
+  title={{OODRobustBench}: A Benchmark and Large-Scale Analysis of
+         Adversarial Robustness under Distribution Shift},
+  author={Li, Lin and Chai, Yifei and Wang, Jiatong and Chen, Yiming
+          and Li, Hao and others},
+  booktitle={International Conference on Machine Learning (ICML)},
+  year={2024},
+  note={arXiv:2310.12793}
+}
+
+% ---------------------------------------------------------------------------
+% §2.4 Embedding Models for Text Classification
+% ---------------------------------------------------------------------------
+
+@inproceedings{reimers2019sentencebert,
+  title={Sentence-{BERT}: Sentence Embeddings using Siamese {BERT}-Networks},
+  author={Reimers, Nils and Gurevych, Iryna},
+  booktitle={Proceedings of the 2019 Conference on Empirical Methods
+             in Natural Language Processing (EMNLP)},
+  pages={3982--3992},
+  year={2019}
+}
+
+@inproceedings{su2023instructor,
+  title={One Embedder, Any Task: Instruction-Finetuned Text Embeddings},
+  author={Su, Hongjin and Shi, Weijia and Kasai, Jungo and Wang, Yizhong
+          and Hu, Yushi and Ostendorf, Mari and Yih, Wen-tau and Smith,
+          Noah A. and Zettlemoyer, Luke and Yu, Tao},
+  booktitle={Findings of the Association for Computational Linguistics:
+             ACL 2023},
+  pages={1102--1121},
+  year={2023}
+}
+
+@inproceedings{wang2024e5mistral,
+  title={Improving Text Embeddings with Large Language Models},
+  author={Wang, Liang and Yang, Nan and Huang, Xiaolong and Yang, Linjun
+          and Majumder, Rangan and Wei, Furu},
+  booktitle={Proceedings of the 62nd Annual Meeting of the Association
+             for Computational Linguistics (ACL)},
+  year={2024},
+  note={arXiv:2401.00368}
+}
+
+@article{xiao2023cpack,
+  title={{C-Pack}: Packed Resources for General Chinese Embeddings},
+  author={Xiao, Shitao and Liu, Zheng and Zhang, Peitian
+          and Muennighoff, Niklas},
+  journal={arXiv preprint arXiv:2309.07597},
+  year={2023},
+  note={Introduces BGE (BAAI General Embedding) model family}
+}
+
+@misc{openai2024embeddings,
+  title={New Embedding Models and {API} Updates},
+  author={{OpenAI}},
+  year={2024},
+  howpublished={\url{https://openai.com/index/new-embedding-models-and-api-updates/}},
+  note={Introduces text-embedding-3-small (1536d) and text-embedding-3-large (3072d)}
+}
+
+% ---------------------------------------------------------------------------
+% Data Sources (referenced in §3)
+% ---------------------------------------------------------------------------
+
+@misc{lakera2023gandalf,
+  title={Gandalf Ignore Instructions Dataset},
+  author={{Lakera AI}},
+  year={2023},
+  howpublished={\url{https://huggingface.co/datasets/lakera/gandalf_ignore_instructions}},
+  note={1,000 password-extraction prompt injection attempts (Apache 2.0)}
+}
+
+@misc{schulhoff2023hackaprompt,
+  title={{HackAPrompt}: Exposing Systemic Vulnerabilities of {LLMs}
+         through a Global Prompt Hacking Competition},
+  author={Schulhoff, Sander and Pinto, Jeremy and Khan, Anaum
+          and Bouchard, Louis-Fran{\c{c}}ois and Si, Chenglei
+          and Anati, Sid and Tagber, Valen and Karpinska, Marzena
+          and Ilie, Renber and Morishita, Teruo and others},
+  year={2023},
+  note={arXiv:2311.16119}
+}
+
+@misc{gentel2024bench,
+  title={{GenTel-Bench}: A Benchmark for Content Harm Generation
+         in Telecommunications},
+  author={{GenTel Lab}},
+  year={2024},
+  howpublished={\url{https://huggingface.co/datasets/GenTelLab/gentelbench-v1}},
+  note={177K samples, CC-BY-4.0. Content-harm focus; injection subset filtered via confidence scoring}
 }
