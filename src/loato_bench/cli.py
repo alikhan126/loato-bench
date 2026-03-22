@@ -1263,6 +1263,78 @@ def cost_performance(
         console.print(f"  {name}: {path}")
 
 
+@analyze_app.command("template-homogeneity")
+def template_homogeneity(
+    output_dir: str = typer.Option(
+        "results/analysis",
+        help="Output directory for figures and JSON.",
+    ),
+    results_dir: str = typer.Option(
+        "results/experiments",
+        help="Directory containing experiment result JSONs.",
+    ),
+    dpi: int = typer.Option(150, help="DPI for saved figures."),
+    seed: int = typer.Option(42, help="Random seed for UMAP."),
+) -> None:
+    """Template homogeneity analysis: correlate template reuse with ΔF1."""
+    import numpy as np
+    import pandas as pd
+
+    from loato_bench.analysis.template_homogeneity import (
+        run_template_homogeneity_analysis,
+    )
+    from loato_bench.utils.config import PROJECT_ROOT
+
+    # Load MiniLM embeddings
+    emb_path = DATA_DIR / "embeddings" / "minilm" / "embeddings.npz"
+    if not emb_path.exists():
+        console.print(f"[red]MiniLM embeddings not found: {emb_path}[/red]")
+        console.print("Run: uv run loato-bench embed run --model minilm")
+        raise typer.Exit(1)
+
+    data = np.load(str(emb_path))
+    embeddings = data["embeddings"]
+
+    # Load labeled dataset
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    if not labeled_path.exists():
+        console.print(f"[red]Dataset not found: {labeled_path}[/red]")
+        raise typer.Exit(1)
+
+    df = pd.read_parquet(labeled_path)
+    labels = df["label"].to_numpy().astype(np.int64)
+    categories = df["attack_category"].fillna("").to_numpy().astype(str)
+
+    splits_path = DATA_DIR / "splits" / "loato_splits.json"
+    if not splits_path.exists():
+        console.print(f"[red]LOATO splits not found: {splits_path}[/red]")
+        raise typer.Exit(1)
+
+    res_path = PROJECT_ROOT / results_dir
+    out_path = PROJECT_ROOT / output_dir
+
+    console.print("[bold green]Running template homogeneity analysis (4B-04)...[/bold green]")
+
+    outputs = run_template_homogeneity_analysis(
+        embeddings=embeddings,
+        labels=labels,
+        categories=categories,
+        splits_path=splits_path,
+        results_dir=res_path,
+        output_dir=out_path,
+        dpi=dpi,
+        seed=seed,
+    )
+
+    if not outputs:
+        console.print("[yellow]No results produced.[/yellow]")
+        return
+
+    console.print(f"\n[bold green]Generated {len(outputs)} outputs:[/bold green]")
+    for name, path in outputs.items():
+        console.print(f"  {name}: {path}")
+
+
 # ---------------------------------------------------------------------------
 # Entrypoint for pyproject.toml [project.scripts]
 # ---------------------------------------------------------------------------
