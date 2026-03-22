@@ -382,7 +382,32 @@ GPT-4o evaluated zero-shot on 500 stratified samples per test pool:
 
 4. **GPT-4o precision is near-perfect** (0.97–0.99) — it almost never false-positives. Weakness is recall (0.63–0.70): it misses ~30% of attacks.
 
-5. **Cost tradeoff**: ~$0.0008/query (GPT-4o) vs ~$0/query (classifier after training). Orders of magnitude more expensive for +0.30 F1 on novel threats.
+5. **Cost tradeoff**: ~$0.0008/query (GPT-4o) vs ~$0/query (classifier after training) — an ~800x cost difference. On known attacks, this cost buys *worse* performance (−0.14 F1). On novel attacks, it buys +0.19 F1 over the best classifier. The cost-performance crossover defines the deployment decision boundary.
+
+### 5.5 Cost-Performance Analysis
+
+The regime map quantifies when to use which approach:
+
+| Test Pool | Best Classifier | GPT-4o | Winner | F1 Gap | Cost Gap |
+|-----------|----------------|--------|--------|--------|----------|
+| Standard CV | 0.997 (OpenAI-Small × MLP) | 0.853 | Classifier | +0.14 | ~800x cheaper |
+| Direct→Indirect | 0.523 (Instructor × SVM) | 0.711 | GPT-4o | +0.19 | ~800x more expensive |
+
+**Layered defense model.** A classifier screens all inputs; a fraction (escalation rate) is escalated to GPT-4o. At key escalation rates on the novel attack surface:
+
+| Escalation Rate | Cost/1K Queries | Est. F1 | F1 Gain |
+|-----------------|-----------------|---------|---------|
+| 0% (classifier only) | $0.001 | 0.523 | — |
+| 10% | $0.08 | 0.542 | +0.019 |
+| 25% | $0.21 | 0.573 | +0.050 |
+| 50% | $0.41 | 0.619 | +0.096 |
+| 100% (GPT-4o only) | $0.80 | 0.711 | +0.187 |
+
+At 10% escalation, the system achieves 80x cost reduction vs GPT-4o-only with modest F1 loss (0.542 vs 0.711). At 25% escalation, cost is still 4x cheaper than GPT-4o-only while gaining +0.05 F1 over classifier-only. The relationship is linear because the model assumes oracle escalation (uncertain predictions escalated first); in practice, a confidence-based escalation policy would yield diminishing returns at higher rates.
+
+**GPT-4o precision-recall tradeoff.** GPT-4o's near-perfect precision (0.967–0.992) means it almost never flags benign text as an injection — critical for user experience. The weakness is recall: it misses 30% of known attacks and 37% of novel indirect injections. For deployment, this means GPT-4o is a reliable *second opinion* (very few false alarms) but not a standalone solution (still misses a third of attacks). This asymmetry favors using GPT-4o as an escalation layer rather than a primary detector.
+
+Full results: `results/analysis/cost_performance_analysis.json` and `results/analysis/figures/`.
 
 ---
 
@@ -418,13 +443,15 @@ Full results: `analysis/transfer_threshold_analysis.json` and `analysis/figures/
 
 ### 6.5 Practical Recommendations
 
-1. **Layered defense**: Use cheap embedding classifiers as a high-precision first layer (they rarely false-positive). Escalate uncertain cases to an LLM for reasoning-based detection.
+1. **Layered defense with cost-aware escalation**: Use embedding classifiers as a high-precision first layer (~$0/query, 0.997 F1 on known attacks). Escalate uncertain cases to an LLM (~$0.0008/query). At 10% escalation, cost is $0.08/1K queries (80x cheaper than LLM-only) with +0.019 F1 gain on novel attacks. At 25% escalation, cost is $0.21/1K (4x cheaper) with +0.05 F1 gain. The optimal rate depends on the deployment's cost tolerance and novel attack exposure (§5.5).
 
 2. **Evaluate with LOATO**: Before deploying a prompt injection classifier, run LOATO evaluation. Report per-category F1, not just aggregate. If any category shows ΔF1 > 0.15, the classifier has a blind spot.
 
-3. **Test direct→indirect transfer**: If the deployment involves RAG or tool use, run a controlled transfer experiment. Standard CV performance is not predictive of indirect injection detection.
+3. **Test direct→indirect transfer**: If the deployment involves RAG or tool use, run a controlled transfer experiment. Standard CV performance is not predictive of indirect injection detection. A 0.997 F1 classifier may score 0.21–0.52 on indirect injections.
 
 4. **Consider threshold calibration (with caveats)**: If AUC-ROC is high but F1 is low, threshold recalibration on a small labeled sample (~10%) of the target distribution can improve F1 from 0.29 → 0.56 on average. However, this requires labeled data from the target distribution and still falls far short of in-distribution performance (0.96 F1). Threshold tuning is a band-aid, not a fix.
+
+5. **Leverage GPT-4o's precision asymmetry**: GPT-4o's precision (0.97–0.99) far exceeds its recall (0.63–0.70). It rarely false-positives, making it ideal as a *second opinion* on escalated cases rather than a primary detector. Combined with a classifier's high recall on known attacks, this produces a system that's both cost-efficient and broadly defensive.
 
 ### 6.6 Interpreting Low ΔF1: Robustness vs Category Redundancy
 
@@ -466,7 +493,7 @@ Embedding-based prompt injection classifiers achieve 0.977–0.997 F1 under stan
 
 The generalization gap is architectural: GPT-4o achieves 0.71 F1 on the same indirect test set with zero training, a +0.30 advantage driven by reasoning about intent rather than matching surface patterns. However, GPT-4o costs orders of magnitude more per query and still misses ~30% of attacks.
 
-We recommend: (1) LOATO-style evaluation as standard practice before deploying prompt injection classifiers, (2) layered defenses combining cheap classifiers with LLM escalation, and (3) explicit testing of direct-to-indirect transfer for any system processing untrusted external content.
+We recommend: (1) LOATO-style evaluation as standard practice before deploying prompt injection classifiers, (2) layered defenses combining cheap classifiers with LLM escalation — at 10% escalation, cost is 80x lower than LLM-only with modest F1 loss (§5.5), and (3) explicit testing of direct-to-indirect transfer for any system processing untrusted external content.
 
 Standard CV scores are reassuring. The real world is not.
 
@@ -474,7 +501,7 @@ Standard CV scores are reassuring. The real world is not.
 
 ## 9. Future Work
 
-1. **Sprint 4B (in progress)**: UMAP visualizations, SHAP feature importance analysis, threshold calibration study, template homogeneity correlation with ΔF1. Core results tables, ΔF1 heatmap, and per-fold analysis completed (LOATO-4B-01).
+1. **Sprint 4B (in progress)**: UMAP visualizations, SHAP feature importance analysis. Core results tables (4B-01), threshold analysis (4B-02), and cost-performance regime map (4B-03) completed.
 
 2. **~~Threshold recalibration study~~** (COMPLETE — §6.4): Threshold recalibration improves transfer F1 from 0.29 → 0.56 on average but cannot fully close the gap. See §6.4 for details.
 
@@ -617,6 +644,7 @@ All classifiers prepend `StandardScaler` in an sklearn pipeline.
 | Sprint 3 results | `results/experiments/standard_cv_*.json`, `results/experiments/loato_*.json` (40 files: 5 emb × 4 clf × 2 experiments) |
 | 4B-01 analysis | `analysis/figures/*.{png,pdf}`, `analysis/tables/*.{md,tex}`, `analysis/4b_01_summary.md` |
 | 4B-02 threshold analysis | `analysis/transfer_threshold_analysis.json`, `analysis/figures/transfer_*.{png,pdf}` |
+| 4B-03 cost-performance | `results/analysis/cost_performance_analysis.json`, `results/analysis/cost_performance_table.md`, `results/analysis/figures/cost_performance_regime_map.{png,pdf}`, `results/analysis/figures/layered_defense_cost_curve.{png,pdf}` |
 | Transfer results (4A-01/02) | `results/experiments/direct_indirect_*.json` (20 files: 5 emb × 4 clf) |
 | LLM baseline results (4A-03) | `results/llm_baseline/llm_baseline_*.json` (2 files + JSONL logs) |
 | EDA outputs | `results/eda/figures/*.png`, `results/eda/*.json` |

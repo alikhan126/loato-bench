@@ -18,10 +18,10 @@
 
 | System | F1 | Notes |
 |--------|-----|-------|
-| Best embedding classifier (standard CV) | **0.95–0.97** | 5 emb × 3 clf, trained |
+| Best embedding classifier (standard CV) | **0.977–0.997** | 5 emb × 4 clf, trained |
 | GPT-4o zero-shot | 0.8528 | No training |
 
-Embedding classifiers outperform GPT-4o by +0.10–0.12 F1 when attacks match training distribution. Cheap classifiers win on familiar ground.
+Embedding classifiers outperform GPT-4o by +0.10–0.12 F1 when attacks match training distribution. Cheap classifiers win on familiar ground. LOATO evaluation (§5.2) shows this advantage narrows slightly when entire attack categories are held out (mean LOATO F1 = 0.957 for top 15 combos, ΔF1 = 0.034), but classifiers still comfortably outperform GPT-4o on known attack types.
 
 ### Direct→Indirect (novel attack surface)
 
@@ -50,7 +50,7 @@ GPT-4o outperforms the best embedding classifier by **+0.30 F1** on indirect inj
 ## Implications for the Thesis
 
 - **Main argument validated**: Standard CV F1 is misleading for deployment safety. A 0.97 F1 classifier misses 60–80% of indirect injections. LOATO and transfer experiments expose this blind spot; the LLM baseline quantifies the cost of closing it.
-- **Practical recommendation**: Use cheap classifiers as a first layer (high precision, fast, free). Escalate uncertain cases to an LLM for reasoning-based detection. Threshold recalibration (if labeled indirect data is available) can further improve the first layer from 0.29 → 0.56 mean F1, reducing LLM escalation volume. This hybrid approach balances cost and safety.
+- **Practical recommendation**: Use cheap classifiers as a first layer (high precision, fast, free). Escalate uncertain cases to an LLM for reasoning-based detection. At 10% escalation, cost is $0.08/1K queries (80x cheaper than LLM-only) with +0.019 F1 gain on novel attacks. Threshold recalibration (if labeled indirect data is available) can further improve the first layer from 0.29 → 0.56 mean F1, reducing LLM escalation volume. See `docs/findings_master.md` §5.5 for the full cost-performance regime map.
 - **Fomin (2026) alignment**: Fomin reported 7–37% detection rates for indirect injections on production guardrails. Our embedding classifiers (21–41% F1) and GPT-4o (71% F1) bracket and extend this finding with controlled, reproducible measurements.
 
 ## Artifacts
