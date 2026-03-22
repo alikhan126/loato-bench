@@ -10,7 +10,7 @@ MS Data Science, Pace University
 
 ## Abstract
 
-Embedding-based prompt injection classifiers achieve 0.977–0.997 F1 under standard cross-validation, suggesting deployment readiness. However, standard CV guarantees every attack type appears in training — a condition violated in real deployments where novel attack techniques emerge continuously. We introduce LOATO-Bench (Leave-One-Attack-Type-Out Benchmark), an evaluation framework that holds out entire attack categories during training to measure cross-attack generalization. Using a unified dataset of 68,845 samples from 9 public sources, harmonized into a 7-category taxonomy, we evaluate 5 embedding models × 3 classifiers under three protocols: standard 5-fold CV, LOATO, and direct-to-indirect transfer. LOATO reveals a mean generalization gap of ΔF1 = 0.034 across 15 combinations, with obfuscation/encoding attacks causing the largest drops (F1 = 0.919 when held out). More critically, classifiers scoring 0.997 F1 under standard CV collapse to 0.21–0.41 F1 when tested on indirect injections unseen during training. A GPT-4o zero-shot baseline scores 0.71 F1 on the same indirect test set — a +0.30 advantage requiring no training — confirming the generalization failure is architectural. We argue that standard CV is insufficient for evaluating prompt injection classifiers intended for production deployment, and that LOATO-style evaluation should become standard practice.
+Embedding-based prompt injection classifiers achieve 0.977–0.997 F1 under standard cross-validation, suggesting deployment readiness. However, standard CV guarantees every attack type appears in training — a condition violated in real deployments where novel attack techniques emerge continuously. We introduce LOATO-Bench (Leave-One-Attack-Type-Out Benchmark), an evaluation framework that holds out entire attack categories during training to measure cross-attack generalization. Using a unified dataset of 68,845 samples from 9 public sources, harmonized into a 7-category taxonomy, we evaluate 5 embedding models × 4 classifiers under three protocols: standard 5-fold CV, LOATO, and direct-to-indirect transfer. LOATO reveals a mean generalization gap of ΔF1 = 0.034 across the top 15 combinations (ΔF1 = 0.051 across all 20), with obfuscation/encoding attacks causing the largest drops (F1 = 0.874 when held out). More critically, classifiers scoring 0.997 F1 under standard CV collapse to 0.21–0.41 F1 when tested on indirect injections unseen during training. A GPT-4o zero-shot baseline scores 0.71 F1 on the same indirect test set — a +0.30 advantage requiring no training — confirming the generalization failure is architectural. We argue that standard CV is insufficient for evaluating prompt injection classifiers intended for production deployment, and that LOATO-style evaluation should become standard practice.
 
 **Keywords**: prompt injection, adversarial attacks, embedding classifiers, evaluation methodology, generalization, LLM security
 
@@ -191,7 +191,7 @@ All classifiers wrap sklearn pipelines with `StandardScaler` as the first step t
 | LogReg | Logistic Regression | C=1.0, max_iter=1000, solver=lbfgs |
 | XGBoost | Gradient Boosted Trees | n_estimators=300, max_depth=6, learning_rate=0.05, tree_method=hist |
 | MLP | Multi-Layer Perceptron | hidden_layers=[256, 128], lr=0.001, max_iter=500, early_stopping=True |
-| SVM | SVM (RBF kernel) | C=1.0, kernel=rbf, gamma=scale (deferred — prohibitively slow with 4096d) |
+| SVM | SVM (RBF kernel) | C=1.0, kernel=rbf, gamma=scale. PCA(128) + Nystroem(500) approximation for tractability on 68K samples |
 
 ### 4.3 Evaluation Protocols
 
@@ -246,90 +246,97 @@ All experiments use seed=42 via `seed_everything()`. Hardware: Apple Silicon Mac
 
 Under standard 5-fold CV, embedding classifiers achieve excellent performance (Macro F1):
 
-| Embedding | LogReg | XGBoost | MLP |
-|-----------|--------|---------|-----|
-| MiniLM (384d) | 0.9770 | 0.9829 | 0.9920 |
-| BGE-Large (1024d) | 0.9894 | 0.9856 | 0.9941 |
-| Instructor (768d) | 0.9945 | 0.9936 | 0.9966 |
-| OpenAI-Small (1536d) | 0.9952 | 0.9925 | **0.9974** |
-| E5-Mistral (4096d) | 0.9937 | 0.9871 | 0.9958 |
+| Embedding | LogReg | SVM | XGBoost | MLP |
+|-----------|--------|-----|---------|-----|
+| MiniLM (384d) | 0.9770 | 0.9281 | 0.9829 | 0.9920 |
+| BGE-Large (1024d) | 0.9894 | 0.8301 | 0.9856 | 0.9941 |
+| Instructor (768d) | 0.9945 | 0.8956 | 0.9936 | 0.9966 |
+| OpenAI-Small (1536d) | 0.9952 | 0.9020 | 0.9925 | **0.9974** |
+| E5-Mistral (4096d) | 0.9937 | 0.8514 | 0.9871 | 0.9958 |
 
-Mean F1 across all 15 combinations: **0.9912**. Best: OpenAI-Small × MLP (0.9974). These numbers look deployment-ready. A team evaluating any of these classifiers with standard CV would reasonably conclude it is safe to ship.
+Mean F1 across all 20 combinations: **0.9637**. Excluding SVM (which uses kernel approximation), the top 15 combinations average **0.9912**. Best: OpenAI-Small × MLP (0.9974). SVM with Nystroem approximation + PCA(128) achieves lower absolute F1 (0.83–0.93) due to the approximation trade-off, but is included for completeness across all 4 classifier architectures. These numbers look deployment-ready. A team evaluating any of these classifiers with standard CV would reasonably conclude it is safe to ship.
 
 ### 5.2 LOATO Reveals the Generalization Gap
 
-When a single attack category is held out during training, F1 drops. Mean LOATO F1 across all 15 combinations: **0.9568**, yielding a mean generalization gap of **ΔF1 = 0.0344**.
+When a single attack category is held out during training, F1 drops. Mean LOATO F1 across all 20 combinations: **0.9130**, yielding a mean generalization gap of **ΔF1 = 0.0507**. Excluding SVM (kernel approximation), the top 15 combinations average LOATO F1 = 0.9568 with ΔF1 = 0.0344.
 
 #### Table 5.2a: LOATO F1 and ΔF1
 
 | Embedding | Classifier | CV F1 | LOATO F1 | ΔF1 |
 |-----------|------------|-------|----------|-----|
-| MiniLM (384d) | LogReg | 0.9770 | 0.9169 | **0.0601** |
+| MiniLM (384d) | LogReg | 0.9770 | 0.9169 | 0.0601 |
+| MiniLM (384d) | SVM | 0.9281 | 0.8102 | 0.1179 |
 | MiniLM (384d) | XGBoost | 0.9829 | 0.9310 | 0.0519 |
 | MiniLM (384d) | MLP | 0.9920 | 0.9626 | 0.0294 |
 | BGE-Large (1024d) | LogReg | 0.9894 | 0.9565 | 0.0329 |
+| BGE-Large (1024d) | SVM | 0.8301 | 0.7588 | 0.0712 |
 | BGE-Large (1024d) | XGBoost | 0.9856 | 0.9275 | 0.0581 |
 | BGE-Large (1024d) | MLP | 0.9941 | 0.9760 | **0.0181** |
 | Instructor (768d) | LogReg | 0.9945 | 0.9670 | 0.0275 |
+| Instructor (768d) | SVM | 0.8956 | 0.7461 | **0.1496** |
 | Instructor (768d) | XGBoost | 0.9936 | 0.9577 | 0.0359 |
 | Instructor (768d) | MLP | 0.9966 | 0.9770 | 0.0196 |
 | OpenAI-Small (1536d) | LogReg | 0.9952 | 0.9659 | 0.0293 |
+| OpenAI-Small (1536d) | SVM | 0.9020 | 0.8184 | 0.0836 |
 | OpenAI-Small (1536d) | XGBoost | 0.9925 | 0.9571 | 0.0354 |
 | OpenAI-Small (1536d) | MLP | 0.9974 | 0.9758 | 0.0216 |
 | E5-Mistral (4096d) | LogReg | 0.9937 | 0.9641 | 0.0297 |
+| E5-Mistral (4096d) | SVM | 0.8514 | 0.7749 | 0.0765 |
 | E5-Mistral (4096d) | XGBoost | 0.9871 | 0.9398 | 0.0473 |
 | E5-Mistral (4096d) | MLP | 0.9958 | 0.9772 | 0.0187 |
 
-Largest gap: MiniLM × LogReg (ΔF1 = 0.060). Smallest gap: BGE-Large × MLP (ΔF1 = 0.018). Statistical testing: **3/15 combinations significant** (p < 0.05, paired t-test across folds) — all involving MiniLM or BGE-Large × LogReg/XGBoost.
+Largest gap: Instructor × SVM (ΔF1 = 0.150). Smallest gap: BGE-Large × MLP (ΔF1 = 0.018). SVM exhibits the largest gaps across all embeddings (0.071–0.150 ΔF1), consistent with kernel approximation limiting its ability to learn precise attack boundaries. Statistical testing: **3/20 combinations significant** (p < 0.05, paired t-test across folds) — MiniLM × LogReg, MiniLM × XGBoost, and BGE-Large × LogReg. SVM's high per-fold variance prevents significance despite large absolute gaps.
 
-#### Table 5.2b: Per-Fold F1 by Held-Out Category (averaged across all 15 combinations)
+#### Table 5.2b: Per-Fold F1 by Held-Out Category (averaged across all 20 combinations)
 
 | Held-Out Category | Mean F1 | Hardest Combo | Easiest Combo |
 |---|---|---|---|
-| **instruction_override** | **0.9866** | MiniLM×LogReg (0.967) | OpenAI-Small×MLP (0.996) |
-| other | 0.9851 | MiniLM×LogReg (0.962) | BGE-Large×MLP (0.994) |
-| information_extraction | 0.9573 | MiniLM×LogReg (0.914) | OpenAI-Small×MLP (0.989) |
-| jailbreak_roleplay | 0.9493 | MiniLM×LogReg (0.912) | OpenAI-Small×MLP (0.972) |
-| social_engineering | 0.9463 | MiniLM×LogReg (0.869) | E5-Mistral×MLP (0.981) |
-| **obfuscation_encoding** | **0.9186** | MiniLM×LogReg (0.878) | BGE-Large×MLP (0.964) |
+| **other** | **0.9507** | BGE-Large×SVM (0.786) | BGE-Large×MLP (0.994) |
+| instruction_override | 0.9457 | E5-Mistral×SVM (0.623) | Instructor×MLP (0.996) |
+| information_extraction | 0.9264 | Instructor×SVM (0.598) | OpenAI-Small×MLP (0.989) |
+| jailbreak_roleplay | 0.9191 | Instructor×SVM (0.783) | OpenAI-Small×MLP (0.972) |
+| social_engineering | 0.9097 | BGE-Large×SVM (0.706) | E5-Mistral×MLP (0.981) |
+| **obfuscation_encoding** | **0.8738** | Instructor×SVM (0.556) | BGE-Large×MLP (0.964) |
 
 **Key findings**:
 
-1. **Obfuscation/Encoding (C3) is the hardest** — mean F1 = 0.919 when held out. Encoded attacks (Base64, ROT13, leetspeak) use patterns not shared with other categories.
+1. **Obfuscation/Encoding (C3) is the hardest** — mean F1 = 0.874 when held out. Encoded attacks (Base64, ROT13, leetspeak) use patterns not shared with other categories. SVM drops to F1 = 0.556 on this category.
 
-2. **Instruction Override (C1) is the easiest** — mean F1 = 0.987 when held out. Other categories contain similar "ignore/override" patterns, so the model generalizes even without explicit C1 training.
+2. **Instruction Override (C1) is no longer easiest** — with SVM included, "other" category (C7) is now easiest (0.951), while C1 drops to 0.946 due to SVM's poor performance on instruction_override (E5-Mistral×SVM = 0.623). Among LogReg/XGBoost/MLP, C1 remains easiest.
 
-3. **MLP consistently has the smallest gap** across all embeddings (0.018–0.029 ΔF1). Its smooth decision boundaries generalize better than XGBoost's tree-based splits (0.035–0.058 ΔF1).
+3. **MLP consistently has the smallest gap** across all embeddings (0.018–0.029 ΔF1). Its smooth decision boundaries generalize better than XGBoost's tree-based splits (0.035–0.058 ΔF1) and SVM's approximated kernel boundaries (0.071–0.150 ΔF1).
 
-4. **Higher-quality embeddings narrow the gap** — MiniLM (cheapest) has the widest range (0.029–0.060 ΔF1), while Instructor/OpenAI/E5-Mistral cluster in a tighter range (0.019–0.047).
+4. **SVM has the largest gaps** across all embeddings (0.071–0.150 ΔF1). The Nystroem kernel approximation + PCA(128) trade-off reduces both baseline performance and generalization ability, amplifying the gap.
 
-5. **The gap connects to template homogeneity** — Categories with higher template homogeneity (surface-level patterns, e.g., C1) are easier to detect even when held out. Semantically diverse categories (C3, C5) expose the generalization gap most starkly.
+5. **Higher-quality embeddings narrow the gap** — MiniLM (cheapest) has the widest range (0.029–0.118 ΔF1), while Instructor/OpenAI/E5-Mistral cluster in a tighter range for non-SVM classifiers (0.019–0.047).
+
+6. **The gap connects to template homogeneity** — Categories with higher template homogeneity (surface-level patterns, e.g., C1) are easier to detect even when held out. Semantically diverse categories (C3, C5) expose the generalization gap most starkly.
 
 ### 5.3 Direct→Indirect Transfer Collapse
 
-15 experiments (5 embeddings × 3 classifiers) trained on direct injections, tested on indirect:
+20 experiments (5 embeddings × 4 classifiers) trained on direct injections, tested on indirect:
 
 #### Table 5.3a: Macro F1
 
-| Embedding | LogReg | XGBoost | MLP |
-|-----------|--------|---------|-----|
-| minilm (384d) | 0.2903 | 0.2207 | 0.2477 |
-| bge_large (1024d) | 0.2711 | 0.2143 | 0.2602 |
-| instructor (768d) | 0.3196 | 0.2263 | 0.3422 |
-| openai_small (1536d) | **0.4081** | 0.2259 | **0.4130** |
-| e5_mistral (4096d) | 0.3248 | 0.2112 | 0.2521 |
+| Embedding | LogReg | SVM | XGBoost | MLP |
+|-----------|--------|-----|---------|-----|
+| minilm (384d) | 0.2903 | 0.2647 | 0.2207 | 0.2477 |
+| bge_large (1024d) | 0.2711 | 0.2071 | 0.2143 | 0.2602 |
+| instructor (768d) | 0.3196 | 0.5231 | 0.2263 | 0.3422 |
+| openai_small (1536d) | **0.4081** | 0.2180 | 0.2259 | **0.4130** |
+| e5_mistral (4096d) | 0.3248 | 0.2056 | 0.2112 | 0.2521 |
 
 #### Table 5.3b: AUC-ROC
 
-| Embedding | LogReg | XGBoost | MLP |
-|-----------|--------|---------|-----|
-| minilm | 0.8338 | 0.8754 | 0.8162 |
-| bge_large | 0.7579 | 0.8751 | 0.7994 |
-| instructor | 0.9366 | 0.9270 | 0.9635 |
-| openai_small | 0.8713 | 0.9034 | 0.9507 |
-| e5_mistral | 0.7971 | 0.7990 | 0.8608 |
+| Embedding | LogReg | SVM | XGBoost | MLP |
+|-----------|--------|-----|---------|-----|
+| minilm | 0.8338 | 0.8727 | 0.8754 | 0.8162 |
+| bge_large | 0.7579 | 0.7353 | 0.8751 | 0.7994 |
+| instructor | 0.9366 | 0.9230 | 0.9270 | 0.9635 |
+| openai_small | 0.8713 | 0.8814 | 0.9034 | 0.9507 |
+| e5_mistral | 0.7971 | 0.6842 | 0.7990 | 0.8608 |
 
-**Headline finding**: F1 collapses from 0.90–0.97 (standard CV) to **0.21–0.41** on indirect injections. A classifier that appears 97% effective under standard evaluation catches only 21–41% of indirect attacks.
+**Headline finding**: F1 collapses from 0.83–0.97 (standard CV) to **0.21–0.52** on indirect injections. A classifier that appears 97% effective under standard evaluation catches only 21–41% of indirect attacks (SVM scores similarly, with one outlier: instructor×SVM = 0.52).
 
 **Observations**:
 
@@ -423,7 +430,7 @@ If ΔF1 ≈ 0, it could mean the model is genuinely robust *or* that attack cate
 
 3. **Single LLM baseline** — Only GPT-4o evaluated. Claude or open-source LLMs (Llama 3) would provide additional data points.
 
-4. **SVM deferred** — SVM with RBF kernel on 4096-dimensional E5-Mistral embeddings is prohibitively slow without PCA dimensionality reduction. SVM results are incomplete.
+4. **SVM uses kernel approximation** — SVM with exact RBF kernel is prohibitively slow on 68K samples. We use Nystroem(500) kernel approximation + PCA(128) for tractability, which achieves lower absolute F1 (0.83–0.93 CV vs 0.97–0.99 for other classifiers). SVM results carry this caveat and should be interpreted as a lower bound on exact-kernel SVM performance.
 
 5. **Taxonomy is researcher-defined** — 7 categories may not capture all real-world attack types. Tier 3 LLM labeling introduces model bias (GPT-4o-mini's classification tendencies).
 
@@ -437,7 +444,7 @@ If ΔF1 ≈ 0, it could mean the model is genuinely robust *or* that attack cate
 
 ## 8. Conclusion
 
-Embedding-based prompt injection classifiers achieve 0.977–0.997 F1 under standard cross-validation, but this metric is misleading for deployment. LOATO evaluation reveals a mean ΔF1 = 0.034 with category-dependent blind spots (obfuscation/encoding: F1 = 0.919 when held out). More critically, direct-to-indirect transfer experiments show F1 collapsing to 0.21–0.41 — a deployment-critical failure that standard evaluation entirely conceals.
+Embedding-based prompt injection classifiers achieve 0.977–0.997 F1 under standard cross-validation, but this metric is misleading for deployment. LOATO evaluation reveals a mean ΔF1 = 0.034 (top 15 combinations) with category-dependent blind spots (obfuscation/encoding: F1 = 0.874 when held out). SVM with kernel approximation shows even larger gaps (ΔF1 = 0.071–0.150). More critically, direct-to-indirect transfer experiments show F1 collapsing to 0.21–0.41 — a deployment-critical failure that standard evaluation entirely conceals.
 
 The generalization gap is architectural: GPT-4o achieves 0.71 F1 on the same indirect test set with zero training, a +0.30 advantage driven by reasoning about intent rather than matching surface patterns. However, GPT-4o costs orders of magnitude more per query and still misses ~30% of attacks.
 
@@ -567,11 +574,14 @@ uv run loato-bench analyze report                # Generate report tables
 - validation_fraction: 0.1
 - Sweep: layers ∈ {[128,64], [256,128], [512,256]}, lr ∈ {0.0001, 0.001, 0.01}
 
-### SVM (deferred)
+### SVM (RBF kernel, Nystroem approximation)
 - C: 1.0
 - kernel: rbf
 - gamma: scale
-- probability: True
+- PCA: 128 components (applied after StandardScaler)
+- Nystroem: 500 components (RBF kernel approximation)
+- Classifier: SGDClassifier(loss=hinge) + CalibratedClassifierCV(cv=3)
+- Threshold: Exact SVC used for n ≤ 10K; Nystroem approximation for n > 10K
 - Sweep: C ∈ {0.1, 1, 10, 100}, gamma ∈ {scale, auto, 0.001, 0.01}
 
 All classifiers prepend `StandardScaler` in an sklearn pipeline.
@@ -586,15 +596,15 @@ All classifiers prepend `StandardScaler` in an sklearn pipeline.
 | Splits | `data/splits/*.json` (4 files + SHA-256 manifest) |
 | Embeddings | `data/embeddings/{model_name}/` (gitignored, reproducible) |
 | Taxonomy spec | `docs/taxonomy_spec_v1.0.md`, `configs/final_categories.json` |
-| Sprint 3 results | `results/experiments/standard_cv_*.json`, `results/experiments/loato_*.json` (30 files) |
+| Sprint 3 results | `results/experiments/standard_cv_*.json`, `results/experiments/loato_*.json` (40 files: 5 emb × 4 clf × 2 experiments) |
 | 4B-01 analysis | `analysis/figures/*.{png,pdf}`, `analysis/tables/*.{md,tex}`, `analysis/4b_01_summary.md` |
-| Transfer results (4A-01) | `results/experiments/direct_indirect_*.json` (15 files) |
+| Transfer results (4A-01/02) | `results/experiments/direct_indirect_*.json` (20 files: 5 emb × 4 clf) |
 | LLM baseline results (4A-03) | `results/llm_baseline/llm_baseline_*.json` (2 files + JSONL logs) |
 | EDA outputs | `results/eda/figures/*.png`, `results/eda/*.json` |
 | Fomin positioning | `docs/related_work_fomin.md`, `docs/references.bib` |
 | Vulnerability demo | `docs/llm_vulnerability_demo.md` |
 | This document | `docs/findings_master.md` |
-| Full codebase | `src/loato_bench/` (769 tests, 90%+ coverage) |
+| Full codebase | `src/loato_bench/` (773 tests, 90%+ coverage) |
 
 ---
 

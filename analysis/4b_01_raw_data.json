@@ -17,6 +17,21 @@
     },
     {
       "Embedding": "MiniLM (384d)",
+      "Classifier": "SVM",
+      "CV_F1": 0.928054037653188,
+      "CV_F1_std": 0.0022530351598113616,
+      "LOATO_F1": 0.8101788912091471,
+      "LOATO_F1_std": 0.07491024400028946,
+      "Delta_F1": 0.11787514644404085,
+      "CV_Precision": 0.9183885043673989,
+      "CV_Recall": 0.914111174185847,
+      "CV_AUC_ROC": 0.9801158605168405,
+      "LOATO_Precision": 0.6202354531276703,
+      "LOATO_Recall": 0.824934106767128,
+      "LOATO_AUC_ROC": 0.9540488528240435
+    },
+    {
+      "Embedding": "MiniLM (384d)",
       "Classifier": "XGBoost",
       "CV_F1": 0.982851379855308,
       "CV_F1_std": 0.000769813610563635,
@@ -59,6 +74,21 @@
       "LOATO_Precision": 0.9043140069153867,
       "LOATO_Recall": 0.9496018662343212,
       "LOATO_AUC_ROC": 0.9959903583808911
+    },
+    {
+      "Embedding": "BGE-Large (1024d)",
+      "Classifier": "SVM",
+      "CV_F1": 0.8300810963051415,
+      "CV_F1_std": 0.0048046861333293075,
+      "LOATO_F1": 0.7588322937337845,
+      "LOATO_F1_std": 0.0695966907988164,
+      "Delta_F1": 0.07124880257135702,
+      "CV_Precision": 0.9195450641240477,
+      "CV_Recall": 0.6836060237676436,
+      "CV_AUC_ROC": 0.9427897675497979,
+      "LOATO_Precision": 0.6469866140531434,
+      "LOATO_Recall": 0.7122751715511703,
+      "LOATO_AUC_ROC": 0.9187573586803476
     },
     {
       "Embedding": "BGE-Large (1024d)",
@@ -107,6 +137,21 @@
     },
     {
       "Embedding": "Instructor (768d)",
+      "Classifier": "SVM",
+      "CV_F1": 0.8956365070153234,
+      "CV_F1_std": 0.0018841513826221004,
+      "LOATO_F1": 0.7460784668278566,
+      "LOATO_F1_std": 0.12744704666689202,
+      "Delta_F1": 0.14955804018746677,
+      "CV_Precision": 0.9466349302538865,
+      "CV_Recall": 0.8088316443042161,
+      "CV_AUC_ROC": 0.9655174371569488,
+      "LOATO_Precision": 0.5880004318932162,
+      "LOATO_Recall": 0.5785511682456548,
+      "LOATO_AUC_ROC": 0.8967054198542189
+    },
+    {
+      "Embedding": "Instructor (768d)",
       "Classifier": "XGBoost",
       "CV_F1": 0.9935973185944522,
       "CV_F1_std": 0.0002951224878346549,
@@ -152,6 +197,21 @@
     },
     {
       "Embedding": "OpenAI-Small (1536d)",
+      "Classifier": "SVM",
+      "CV_F1": 0.9020205296764031,
+      "CV_F1_std": 0.004335752930863686,
+      "LOATO_F1": 0.8183892137519111,
+      "LOATO_F1_std": 0.06015741772916749,
+      "Delta_F1": 0.08363131592449202,
+      "CV_Precision": 0.9400625169261166,
+      "CV_Recall": 0.8294372520192688,
+      "CV_AUC_ROC": 0.9804437016692569,
+      "LOATO_Precision": 0.7247439343468914,
+      "LOATO_Recall": 0.8059986360752142,
+      "LOATO_AUC_ROC": 0.9731051798548768
+    },
+    {
+      "Embedding": "OpenAI-Small (1536d)",
       "Classifier": "XGBoost",
       "CV_F1": 0.9925238165457364,
       "CV_F1_std": 0.0004745989064105349,
@@ -194,6 +254,21 @@
       "LOATO_Precision": 0.9302285144543667,
       "LOATO_Recall": 0.9460360551601276,
       "LOATO_AUC_ROC": 0.9953921844758463
+    },
+    {
+      "Embedding": "E5-Mistral (4096d)",
+      "Classifier": "SVM",
+      "CV_F1": 0.8514359729736747,
+      "CV_F1_std": 0.005011551889176625,
+      "LOATO_F1": 0.7749485469950866,
+      "LOATO_F1_std": 0.07026565052809078,
+      "Delta_F1": 0.07648742597858804,
+      "CV_Precision": 0.9761594746525681,
+      "CV_Recall": 0.6909260765097549,
+      "CV_AUC_ROC": 0.9794967240808224,
+      "LOATO_Precision": 0.8096483841877723,
+      "LOATO_Recall": 0.5640534701300576,
+      "LOATO_AUC_ROC": 0.9479564250521189
     },
     {
       "Embedding": "E5-Mistral (4096d)",
@@ -251,6 +326,17 @@
     },
     {
       "Embedding": "BGE-Large (1024d)",
+      "Classifier": "SVM",
+      "information_extraction": 0.8542430941328789,
+      "instruction_override": 0.6375830692959379,
+      "jailbreak_roleplay": 0.7979815734491968,
+      "obfuscation_encoding": 0.7721004268419235,
+      "other": 0.7855157288092077,
+      "social_engineering": 0.7055698698735622,
+      "Mean": 0.7588322937337845
+    },
+    {
+      "Embedding": "BGE-Large (1024d)",
       "Classifier": "XGBoost",
       "information_extraction": 0.9126488301164831,
       "instruction_override": 0.981353500613361,
@@ -281,6 +367,17 @@
       "other": 0.992600855270251,
       "social_engineering": 0.9808806655407518,
       "Mean": 0.9771628930204471
+    },
+    {
+      "Embedding": "E5-Mistral (4096d)",
+      "Classifier": "SVM",
+      "information_extraction": 0.8072639939678965,
+      "instruction_override": 0.6232027689100971,
+      "jailbreak_roleplay": 0.8324424355116977,
+      "obfuscation_encoding": 0.7709345607915179,
+      "other": 0.8026269815358479,
+      "social_engineering": 0.8132205412534627,
+      "Mean": 0.7749485469950866
     },
     {
       "Embedding": "E5-Mistral (4096d)",
@@ -317,6 +414,17 @@
     },
     {
       "Embedding": "Instructor (768d)",
+      "Classifier": "SVM",
+      "information_extraction": 0.5975850150339037,
+      "instruction_override": 0.8612772207507425,
+      "jailbreak_roleplay": 0.782998268682612,
+      "obfuscation_encoding": 0.5562084679758058,
+      "other": 0.8999387584297114,
+      "social_engineering": 0.7784630700943644,
+      "Mean": 0.7460784668278566
+    },
+    {
+      "Embedding": "Instructor (768d)",
       "Classifier": "XGBoost",
       "information_extraction": 0.952520143786922,
       "instruction_override": 0.9872220983933532,
@@ -347,6 +455,17 @@
       "other": 0.9916213790187538,
       "social_engineering": 0.959883868494031,
       "Mean": 0.9625991713113478
+    },
+    {
+      "Embedding": "MiniLM (384d)",
+      "Classifier": "SVM",
+      "information_extraction": 0.7579771027834739,
+      "instruction_override": 0.8945967609063208,
+      "jailbreak_roleplay": 0.8043468995824234,
+      "obfuscation_encoding": 0.7484339183851281,
+      "other": 0.9262112892436418,
+      "social_engineering": 0.7295073763538945,
+      "Mean": 0.8101788912091471
     },
     {
       "Embedding": "MiniLM (384d)",
@@ -383,6 +502,17 @@
     },
     {
       "Embedding": "OpenAI-Small (1536d)",
+      "Classifier": "SVM",
+      "information_extraction": 0.9072936286068607,
+      "instruction_override": 0.7131793661934027,
+      "jailbreak_roleplay": 0.8359916086647168,
+      "obfuscation_encoding": 0.8509968639065724,
+      "other": 0.8213431618385931,
+      "social_engineering": 0.7815306533013209,
+      "Mean": 0.8183892137519111
+    },
+    {
+      "Embedding": "OpenAI-Small (1536d)",
       "Classifier": "XGBoost",
       "information_extraction": 0.9643477971168022,
       "instruction_override": 0.9869540305274795,
@@ -401,6 +531,14 @@
       "p_value": 0.03849015154130721,
       "test_name": "Paired t-test",
       "significant": true
+    },
+    {
+      "embedding": "MiniLM (384d)",
+      "classifier": "SVM",
+      "statistic": 2.7658076537668514,
+      "p_value": 0.050547677245639216,
+      "test_name": "Paired t-test",
+      "significant": false
     },
     {
       "embedding": "MiniLM (384d)",
@@ -428,6 +566,14 @@
     },
     {
       "embedding": "BGE-Large (1024d)",
+      "classifier": "SVM",
+      "statistic": 1.6936528249324387,
+      "p_value": 0.16558222440097264,
+      "test_name": "Paired t-test",
+      "significant": false
+    },
+    {
+      "embedding": "BGE-Large (1024d)",
       "classifier": "XGBoost",
       "statistic": 2.336209261562761,
       "p_value": 0.07970829759249803,
@@ -447,6 +593,14 @@
       "classifier": "LogReg",
       "statistic": 2.429943841730171,
       "p_value": 0.07198533430169778,
+      "test_name": "Paired t-test",
+      "significant": false
+    },
+    {
+      "embedding": "Instructor (768d)",
+      "classifier": "SVM",
+      "statistic": 2.249763343753868,
+      "p_value": 0.08766815242599518,
       "test_name": "Paired t-test",
       "significant": false
     },
@@ -476,6 +630,14 @@
     },
     {
       "embedding": "OpenAI-Small (1536d)",
+      "classifier": "SVM",
+      "statistic": 2.326224626888355,
+      "p_value": 0.08058477507110948,
+      "test_name": "Paired t-test",
+      "significant": false
+    },
+    {
+      "embedding": "OpenAI-Small (1536d)",
       "classifier": "XGBoost",
       "statistic": 2.265262755131822,
       "p_value": 0.08617754351783348,
@@ -495,6 +657,14 @@
       "classifier": "LogReg",
       "statistic": 2.5640136567431338,
       "p_value": 0.0623724994025276,
+      "test_name": "Paired t-test",
+      "significant": false
+    },
+    {
+      "embedding": "E5-Mistral (4096d)",
+      "classifier": "SVM",
+      "statistic": 2.2877810723104957,
+      "p_value": 0.0840623338505953,
       "test_name": "Paired t-test",
       "significant": false
     },
