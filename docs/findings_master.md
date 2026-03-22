@@ -402,7 +402,19 @@ LOATO per-fold analysis reveals that some categories (e.g., Instruction Override
 
 ### 6.4 AUC-ROC vs F1: A Threshold Problem
 
-The high AUC-ROC (0.76–0.96) despite low F1 (0.21–0.41) on transfer experiments suggests classifiers can partially *rank* indirect injections correctly but their decision boundaries are miscalibrated. Threshold recalibration on a small labeled sample of indirect injections could substantially improve F1 without retraining. This is a practical intervention worth investigating.
+The high AUC-ROC (0.68–0.96) despite low F1 (0.21–0.52) on transfer experiments suggests classifiers can partially *rank* indirect injections correctly but their decision boundaries are miscalibrated. We quantify this with threshold analysis across all 20 transfer combinations.
+
+**Score distributional shift.** Classifiers trained on direct injections assign dramatically lower P(injection) scores to indirect injections. The mean score shift (injection class, train vs test) ranges from −0.27 to −0.97, with most combinations showing shifts below −0.78. At the default threshold of 0.5, nearly all indirect injections fall below the decision boundary.
+
+**Oracle threshold analysis.** Sweeping thresholds to maximize F1 on the indirect test set reveals a ceiling for threshold recalibration. Oracle F1 ranges from 0.35 (MiniLM × MLP) to 0.88 (Instructor × SVM), with a mean of 0.56 across all 20 combinations — a +0.27 improvement over uncalibrated F1 (mean 0.29). However, oracle thresholds are extremely aggressive: 15 of 20 combinations require t ≤ 0.01, meaning nearly every sample above baseline noise is classified as injection. This would unacceptably raise false positives in deployment.
+
+**Practical calibration.** Using 10% of the indirect test set for threshold tuning (simulating access to a small labeled sample), calibrated F1 closely matches oracle F1 (mean calibrated F1 = 0.56 vs oracle 0.57), confirming that a small labeled sample suffices to find the right threshold. The improvement is real but limited — threshold recalibration cannot recover the full AUC-ROC potential because the underlying score distributions overlap too much for most classifiers.
+
+**SVM is the outlier.** SVM benefits disproportionately from threshold recalibration: oracle F1 jumps from 0.21–0.52 (uncalibrated) to 0.61–0.88. The Nystroem approximation produces better-separated probability distributions (score shifts of −0.27 to −0.78, less extreme than other classifiers at −0.78 to −0.97). Instructor × SVM achieves the highest oracle F1 (0.88) and calibrated F1 (0.88) across all combinations.
+
+**Bottom line.** Threshold recalibration provides a meaningful but insufficient fix. Mean F1 improves from 0.29 → 0.56, but this still falls well below the 0.91 LOATO F1 and 0.96 Standard CV F1 achieved in-distribution. The gap is not merely a calibration problem — classifiers fundamentally assign lower confidence to indirect injections because the patterns they learned from direct injections do not transfer. High AUC-ROC reflects correct *relative* ranking within the test set, but the absolute score distributions are too shifted for threshold tuning alone to close the gap.
+
+Full results: `analysis/transfer_threshold_analysis.json` and `analysis/figures/transfer_threshold_summary.{png,pdf}`.
 
 ### 6.5 Practical Recommendations
 
@@ -412,7 +424,7 @@ The high AUC-ROC (0.76–0.96) despite low F1 (0.21–0.41) on transfer experime
 
 3. **Test direct→indirect transfer**: If the deployment involves RAG or tool use, run a controlled transfer experiment. Standard CV performance is not predictive of indirect injection detection.
 
-4. **Consider threshold calibration**: If AUC-ROC is high but F1 is low, the classifier may benefit from Platt scaling or isotonic calibration on a small sample of the target distribution.
+4. **Consider threshold calibration (with caveats)**: If AUC-ROC is high but F1 is low, threshold recalibration on a small labeled sample (~10%) of the target distribution can improve F1 from 0.29 → 0.56 on average. However, this requires labeled data from the target distribution and still falls far short of in-distribution performance (0.96 F1). Threshold tuning is a band-aid, not a fix.
 
 ### 6.6 Interpreting Low ΔF1: Robustness vs Category Redundancy
 
@@ -464,7 +476,7 @@ Standard CV scores are reassuring. The real world is not.
 
 1. **Sprint 4B (in progress)**: UMAP visualizations, SHAP feature importance analysis, threshold calibration study, template homogeneity correlation with ΔF1. Core results tables, ΔF1 heatmap, and per-fold analysis completed (LOATO-4B-01).
 
-2. **Threshold recalibration study**: Test whether Platt scaling or isotonic calibration on a small labeled sample of indirect injections can close the F1 gap suggested by high AUC-ROC.
+2. **~~Threshold recalibration study~~** (COMPLETE — §6.4): Threshold recalibration improves transfer F1 from 0.29 → 0.56 on average but cannot fully close the gap. See §6.4 for details.
 
 3. **Multi-model LLM baseline**: Evaluate Claude, Llama 3, and Gemini to determine if the reasoning advantage is model-specific or general.
 
@@ -604,6 +616,7 @@ All classifiers prepend `StandardScaler` in an sklearn pipeline.
 | Taxonomy spec | `docs/taxonomy_spec_v1.0.md`, `configs/final_categories.json` |
 | Sprint 3 results | `results/experiments/standard_cv_*.json`, `results/experiments/loato_*.json` (40 files: 5 emb × 4 clf × 2 experiments) |
 | 4B-01 analysis | `analysis/figures/*.{png,pdf}`, `analysis/tables/*.{md,tex}`, `analysis/4b_01_summary.md` |
+| 4B-02 threshold analysis | `analysis/transfer_threshold_analysis.json`, `analysis/figures/transfer_*.{png,pdf}` |
 | Transfer results (4A-01/02) | `results/experiments/direct_indirect_*.json` (20 files: 5 emb × 4 clf) |
 | LLM baseline results (4A-03) | `results/llm_baseline/llm_baseline_*.json` (2 files + JSONL logs) |
 | EDA outputs | `results/eda/figures/*.png`, `results/eda/*.json` |
@@ -632,7 +645,7 @@ That's the point. We span tiny (MiniLM, 384d) to large (E5-Mistral, 4096d), open
 XGBoost builds decision trees that split on specific feature thresholds — excellent at memorizing exact patterns, terrible at extrapolating. Direct injections have distinctive surface patterns. When indirect injections arrive with completely different surface text, the decision boundaries don't transfer. LogReg and MLP learn smoother decision boundaries and handle the shift slightly better.
 
 ### Q6: Why is AUC-ROC high but F1 low for transfer?
-AUC-ROC measures ranking quality ("can it tell injections are *more likely* than benign?"). F1 measures hard classification at threshold=0.5. Classifiers rank indirect injections somewhat correctly but the threshold calibrated on direct injections is wrong for the shifted distribution. Threshold recalibration could partially close the gap.
+AUC-ROC measures ranking quality ("can it tell injections are *more likely* than benign?"). F1 measures hard classification at threshold=0.5. Classifiers rank indirect injections somewhat correctly but the threshold calibrated on direct injections is wrong for the shifted distribution. Our threshold analysis (§6.4) shows recalibration improves mean F1 from 0.29 → 0.56 but cannot match in-distribution performance (0.96), confirming the gap is fundamentally about representation, not calibration.
 
 ### Q7: If ΔF1 ≈ 0, is the model smart or are categories too similar?
 Could be either. We distinguish via: (a) per-fold variance — uniform low ΔF1 suggests redundancy, one large drop suggests genuine difficulty; (b) inter-category embedding centroid distances; (c) SHAP feature importance stability across folds; (d) contamination checks (completed, minimal).

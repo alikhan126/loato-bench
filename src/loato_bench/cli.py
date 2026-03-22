@@ -1145,6 +1145,77 @@ def report(
         console.print(f"  {name}: {path}")
 
 
+@analyze_app.command("transfer-threshold")
+def transfer_threshold(
+    output_dir: str = typer.Option(
+        "analysis",
+        help="Output directory for tables, figures, and summary.",
+    ),
+    dpi: int = typer.Option(150, help="DPI for saved figures."),
+) -> None:
+    """Threshold analysis for Direct→Indirect transfer."""
+    import numpy as np
+    import pandas as pd
+
+    from loato_bench.classifiers import (
+        LogRegClassifier,
+        MLPClassifier,
+        SVMClassifier,
+        XGBoostClassifier,
+    )
+    from loato_bench.classifiers.base import Classifier
+    from loato_bench.embeddings import EmbeddingCache
+    from loato_bench.utils.config import PROJECT_ROOT
+
+    split_path = DATA_DIR / "splits" / "direct_indirect_split.json"
+    if not split_path.exists():
+        console.print(f"[red]Split file not found: {split_path}[/red]")
+        raise typer.Exit(1)
+
+    # Load labels
+    labeled_path = DATA_DIR / "processed" / "labeled_v1.parquet"
+    df = pd.read_parquet(labeled_path)
+    labels = df["label"].to_numpy().astype(np.int64)
+
+    clf_factories: dict[str, Callable[[], Classifier]] = {
+        "logreg": LogRegClassifier,
+        "svm": lambda: SVMClassifier(pca_components=128),
+        "xgboost": XGBoostClassifier,
+        "mlp": MLPClassifier,
+    }
+
+    def load_embeddings(name: str) -> np.ndarray | None:
+        cache = EmbeddingCache(name)
+        cached = cache.load()
+        if cached is None:
+            return None
+        emb, _ = cached
+        return emb
+
+    out_path = PROJECT_ROOT / output_dir
+
+    console.print("[bold green]Running transfer threshold analysis (20 combos)...[/bold green]")
+
+    from loato_bench.analysis.transfer_analysis import run_transfer_threshold_analysis
+
+    outputs = run_transfer_threshold_analysis(
+        embeddings_loader=load_embeddings,
+        labels=labels,
+        split_path=split_path,
+        classifier_factories=clf_factories,
+        output_dir=out_path,
+        dpi=dpi,
+    )
+
+    if not outputs:
+        console.print("[yellow]No results produced.[/yellow]")
+        return
+
+    console.print(f"\n[bold green]Generated {len(outputs)} outputs:[/bold green]")
+    for name, path in outputs.items():
+        console.print(f"  {name}: {path}")
+
+
 # ---------------------------------------------------------------------------
 # Entrypoint for pyproject.toml [project.scripts]
 # ---------------------------------------------------------------------------
