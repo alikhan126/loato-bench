@@ -18,10 +18,10 @@
 
 | System | F1 | Notes |
 |--------|-----|-------|
-| Best embedding classifier (standard CV) | **0.95–0.97** | 5 emb × 3 clf, trained |
+| Best embedding classifier (standard CV) | **0.977–0.997** | 5 emb × 4 clf, trained |
 | GPT-4o zero-shot | 0.8528 | No training |
 
-Embedding classifiers outperform GPT-4o by +0.10–0.12 F1 when attacks match training distribution. Cheap classifiers win on familiar ground.
+Embedding classifiers outperform GPT-4o by +0.10–0.12 F1 when attacks match training distribution. Cheap classifiers win on familiar ground. LOATO evaluation (§5.2) shows this advantage narrows slightly when entire attack categories are held out (mean LOATO F1 = 0.957 for top 15 combos, ΔF1 = 0.034), but classifiers still comfortably outperform GPT-4o on known attack types.
 
 ### Direct→Indirect (novel attack surface)
 
