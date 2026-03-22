@@ -58,13 +58,14 @@ PCA to 256 dimensions is the standard mitigation:
 
 ## Acceptance Criteria
 
-- [ ] SVM runs complete for **Standard CV** (5 embeddings × 5 folds = 25 runs)
-- [ ] SVM runs complete for **LOATO** (5 embeddings × 5-6 folds = 25-30 runs)
-- [ ] PCA (256d) applied as preprocessing before SVM for all embeddings
-- [ ] Results saved as `standard_cv_{embedding}_svm.json` and `loato_{embedding}_svm.json`
+- [x] SVM runs complete for **Standard CV** (5 embeddings × 5 folds = 25 runs)
+- [x] SVM runs complete for **LOATO** (5 embeddings × 6 folds = 30 runs)
+- [x] SVM runs complete for **Direct→Indirect** (5 embeddings × 1 fold = 5 runs)
+- [x] PCA (128d) + Nystroem(500) kernel approximation applied for tractability on 68K samples
+- [x] Results saved as `{experiment}_{embedding}_svm.json` (15 files)
 - [ ] Results uploaded to HF Hub (`alikhan126/loato-bench-artifacts`)
-- [ ] README results table updated (15 → 20 rows, now includes SVM)
-- [ ] All existing tests still pass (712+)
+- [x] All results tables updated (15 → 20 rows, now includes SVM)
+- [x] All existing tests still pass (773 tests)
 
 ---
 

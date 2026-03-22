@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 
 from rich.console import Console
@@ -656,6 +657,7 @@ def train_run(
         SVMClassifier,
         XGBoostClassifier,
     )
+    from loato_bench.classifiers.base import Classifier
     from loato_bench.embeddings import EmbeddingCache
     from loato_bench.evaluation.loato import run_experiment
 
@@ -688,10 +690,10 @@ def train_run(
     df = pd.read_parquet(labeled_path)
     labels = df["label"].to_numpy().astype(np.int64)
 
-    # Classifier factory
-    clf_map: dict[str, type] = {
+    # Classifier factory — SVM uses PCA(256) to keep RBF kernel tractable
+    clf_factories: dict[str, Callable[[], Classifier]] = {
         "logreg": LogRegClassifier,
-        "svm": SVMClassifier,
+        "svm": lambda: SVMClassifier(pca_components=128),
         "xgboost": XGBoostClassifier,
         "mlp": MLPClassifier,
     }
@@ -723,10 +725,10 @@ def train_run(
             continue
 
         # Create classifier
-        if clf_name not in clf_map:
+        if clf_name not in clf_factories:
             console.print(f"  [red]Unknown classifier: {clf_name}[/red]")
             continue
-        clf = clf_map[clf_name]()
+        clf = clf_factories[clf_name]()
 
         # Run experiment
         result = run_experiment(

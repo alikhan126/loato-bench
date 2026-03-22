@@ -203,6 +203,43 @@ class TestClassifierHyperparams:
         clf.fit(X, y)
         assert clf.predict(X).shape == (len(X),)
 
+    def test_svm_with_pca(self, toy_data):
+        X, y = toy_data
+        clf = SVMClassifier(pca_components=4)
+        clf.fit(X, y)
+        preds = clf.predict(X)
+        assert preds.shape == (len(X),)
+        assert preds.dtype == np.int64
+
+    def test_svm_pca_proba(self, toy_data):
+        X, y = toy_data
+        clf = SVMClassifier(pca_components=4)
+        clf.fit(X, y)
+        proba = clf.predict_proba(X)
+        assert proba.shape == (len(X), 2)
+        np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-5)
+
+    def test_svm_pca_accuracy(self, toy_data):
+        X, y = toy_data
+        clf = SVMClassifier(pca_components=4)
+        clf.fit(X, y)
+        preds = clf.predict(X)
+        accuracy = (preds == y).mean()
+        assert accuracy >= 0.90, f"SVM+PCA accuracy {accuracy:.2f} < 0.90"
+
+    def test_svm_pca_high_dim(self):
+        """SVM+PCA handles high-dimensional input (simulating E5-Mistral 4096d)."""
+        rng = np.random.RandomState(42)
+        X_pos = rng.randn(50, 512).astype(np.float32) + 1.0
+        X_neg = rng.randn(50, 512).astype(np.float32) - 1.0
+        X = np.vstack([X_pos, X_neg])
+        y = np.array([1] * 50 + [0] * 50, dtype=np.int64)
+        clf = SVMClassifier(pca_components=64)
+        clf.fit(X, y)
+        preds = clf.predict(X)
+        assert preds.shape == (100,)
+        assert (preds == y).mean() >= 0.85
+
     def test_xgboost_custom_params(self, toy_data):
         X, y = toy_data
         clf = XGBoostClassifier(n_estimators=50, max_depth=3, learning_rate=0.1)
