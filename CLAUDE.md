@@ -181,7 +181,7 @@ Stats: bootstrap 95% CIs (10K resamples), McNemar, Friedman + Nemenyi, Cohen's d
 - [x] Sprint 2A: Taxonomy finalization (Tier 3 LLM labeling, 7-category v1.0) + split generation + data artifacts tracked in Git LFS
 - [x] Sprint 2B: Classifier implementations + training pipeline + balanced dataset (68.8K samples)
 - [x] Sprint 3: Core experiments (Standard CV + LOATO) — 5 embeddings × 3 classifiers (30 runs)
-- [ ] Sprint 4A: Transfer experiments (direct→indirect), SVM (with PCA), LLM baseline
+- [x] Sprint 4A: Transfer experiments (direct→indirect), SVM (with PCA + Nystroem), LLM baseline — 5 emb × 4 clf × 3 experiments (60 runs)
 - [ ] Sprint 4B: Analysis & visualization (UMAP, heatmaps, SHAP, report)
 - [ ] Sprint 5: Integration + write-up
 

@@ -1,4 +1,5 @@
 # SVM (RBF kernel) classifier configuration
+# PCA(256) applied before SVM to keep RBF kernel tractable on high-dim embeddings
 classifier:
   name: "svm"
   class: "promptguard.classifiers.svm.SVMClassifier"
@@ -7,6 +8,7 @@ classifier:
     kernel: "rbf"
     gamma: "scale"
     probability: true
+    pca_components: 128
   sweep:
     C: [0.1, 1, 10, 100]
     gamma: ["scale", "auto", 0.001, 0.01]

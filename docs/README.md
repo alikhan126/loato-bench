@@ -17,9 +17,9 @@ Live test results from Claude Sonnet and GPT-4o-mini against direct and RAG-styl
 **Last Updated**: February 19, 2026
 
 ### [**findings_direct_indirect.md**](./findings_direct_indirect.md) — Direct→Indirect Transfer Findings
-**Sprint 4A: LOATO-4A-01 Transfer Experiments**
+**Sprint 4A: LOATO-4A-01 + 4A-02 Transfer Experiments**
 
-Results from 15 experiments (5 embeddings × 3 classifiers) training on direct injections and testing on indirect. F1 collapses to 0.21–0.41, revealing a deployment-critical blind spot. Includes comparison with Fomin (2026).
+Results from 20 experiments (5 embeddings × 4 classifiers) training on direct injections and testing on indirect. F1 collapses to 0.21–0.52, revealing a deployment-critical blind spot. SVM added via Nystroem kernel approximation + PCA(128). Includes comparison with Fomin (2026).
 
 **Status**: Complete
 **Last Updated**: March 21, 2026
@@ -164,7 +164,7 @@ Can embedding-based classifiers **generalize to novel attack types** they've nev
 | **Sprint 2A** | Taxonomy + Splits | ✅ Complete | taxonomy_spec_v1.0.md |
 | **Sprint 2B** | Classifiers | ✅ Complete | - |
 | **Sprint 3** | Experiments | ✅ Complete | - |
-| **Sprint 4A** | Transfer | ⏳ In Progress | **findings_direct_indirect.md**, related_work_fomin.md |
+| **Sprint 4A** | Transfer + SVM | ✅ Complete | **findings_direct_indirect.md**, related_work_fomin.md, findings_llm_baseline.md |
 | **Sprint 4B** | Analysis | ⏳ Upcoming | TBD |
 | **Sprint 5** | Write-up | ⏳ Final | TBD |
 
@@ -187,7 +187,7 @@ Can embedding-based classifiers **generalize to novel attack types** they've nev
 ### Infrastructure
 - **W&B** — Experiment tracking
 - **Jupyter** — Interactive analysis
-- **pytest** — Testing (107 tests)
+- **pytest** — Testing (773 tests)
 - **mypy** — Type checking
 - **ruff** — Linting & formatting
 
