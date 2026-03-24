@@ -46,3 +46,23 @@ wandb/
 # Coverage reports
 .coverage
 htmlcov/
+coverage_html/
+
+# Claude Code
+.claude/
+
+# Analysis working directory
+/analysis/
+
+# Paper build artifacts
+paper/*.pdf
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
+paper/*.xdv
+paper/*.run.xml

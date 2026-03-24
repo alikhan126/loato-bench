@@ -1,6 +1,6 @@
 .PHONY: pdf clean
 
-MAIN = main
+MAIN = loato_bench
 
 pdf: $(MAIN).pdf
 

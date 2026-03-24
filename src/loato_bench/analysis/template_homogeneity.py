@@ -30,13 +30,14 @@ logger = logging.getLogger(__name__)
 plt.switch_backend("Agg")
 sns.set_style("whitegrid")
 
-# LOATO-eligible categories (C1–C5); excludes C7 "other"
+# LOATO categories (C1–C5 + C7 "other"); all 6 folds from loato_splits.json
 LOATO_CATEGORIES = [
     "instruction_override",
     "jailbreak_roleplay",
     "obfuscation_encoding",
     "information_extraction",
     "social_engineering",
+    "other",
 ]
 
 CATEGORY_SHORT: dict[str, str] = {
@@ -356,6 +357,7 @@ def plot_umap_projection(
     max_samples: int = 8000,
     seed: int = 42,
     dpi: int = 150,
+    highlight_category: str | None = None,
 ) -> list[Path]:
     """UMAP 2D projection of injection samples colored by attack category.
 
@@ -375,6 +377,10 @@ def plot_umap_projection(
         Random seed for UMAP and subsampling.
     dpi : int
         Figure DPI.
+    highlight_category : str or None
+        Short category ID (e.g. "C3") to highlight. When set, other categories
+        are plotted with muted colors and the highlighted category is drawn on
+        top with bold markers and an annotation.
 
     Returns
     -------
@@ -414,23 +420,87 @@ def plot_umap_projection(
         }
     )
 
+    # Reverse lookup for annotation: short ID → full name
+    _SHORT_TO_FULL: dict[str, str] = {
+        "C1": "Instruction Override",
+        "C2": "Jailbreak / Roleplay",
+        "C3": "Obfuscation / Encoding",
+        "C4": "Information Extraction",
+        "C5": "Social Engineering",
+        "C6": "Context Manipulation",
+        "C7": "Other",
+    }
+
     for ext in ("png", "pdf"):
         out = safe_output_path(output_dir / f"umap_category_projection.{ext}")
 
         with managed_figure(figsize=(10, 8), dpi=dpi) as (fig, ax):
-            n_cats = plot_df["Category"].nunique()
-            palette = sns.color_palette("Set2", n_cats)
-            sns.scatterplot(
-                data=plot_df,
-                x="UMAP-1",
-                y="UMAP-2",
-                hue="Category",
-                palette=palette,
-                s=15,
-                alpha=0.6,
-                linewidth=0,
-                ax=ax,
-            )
+            if highlight_category is not None:
+                # --- Highlighted mode ---
+                bg_df = plot_df[plot_df["Category"] != highlight_category]
+                fg_df = plot_df[plot_df["Category"] == highlight_category]
+
+                # Background: muted colors
+                n_cats = plot_df["Category"].nunique()
+                palette = sns.color_palette("Set2", n_cats)
+                cat_order = sorted(plot_df["Category"].unique())
+                bg_palette = {c: (*palette[i][:3], 0.25) for i, c in enumerate(cat_order)}
+
+                for cat in sorted(bg_df["Category"].unique()):
+                    subset = bg_df[bg_df["Category"] == cat]
+                    ax.scatter(
+                        subset["UMAP-1"],
+                        subset["UMAP-2"],
+                        c=[bg_palette[cat]],
+                        s=12,
+                        linewidth=0,
+                        label=cat,
+                    )
+
+                # Foreground: highlighted category
+                ax.scatter(
+                    fg_df["UMAP-1"],
+                    fg_df["UMAP-2"],
+                    c="#e74c3c",
+                    s=30,
+                    alpha=0.9,
+                    edgecolors="black",
+                    linewidths=0.3,
+                    zorder=5,
+                    label=highlight_category,
+                )
+
+                # Annotate cluster centroid
+                if len(fg_df) > 0:
+                    cx = fg_df["UMAP-1"].mean()
+                    cy = fg_df["UMAP-2"].mean()
+                    full_name = _SHORT_TO_FULL.get(highlight_category, highlight_category)
+                    ax.annotate(
+                        f"{highlight_category}: {full_name}",
+                        xy=(cx, cy),
+                        xytext=(30, 30),
+                        textcoords="offset points",
+                        fontsize=11,
+                        fontweight="bold",
+                        color="#e74c3c",
+                        arrowprops=dict(arrowstyle="->", color="#e74c3c", lw=1.5),
+                    )
+            else:
+                # --- Default mode ---
+                n_cats = plot_df["Category"].nunique()
+                palette = sns.color_palette("Set2", n_cats)
+                sns.scatterplot(
+                    data=plot_df,
+                    x="UMAP-1",
+                    y="UMAP-2",
+                    hue="Category",
+                    palette=palette,
+                    s=15,
+                    alpha=0.6,
+                    linewidth=0,
+                    ax=ax,
+                )
+
             ax.set_title(
                 "UMAP Projection of Injection Samples by Category\n(MiniLM embeddings)",
                 fontsize=14,
@@ -630,7 +700,7 @@ def run_template_homogeneity_analysis(
     for p in heatmap_paths:
         outputs[f"heatmap_{p.suffix[1:]}"] = p
 
-    # 6. UMAP projection
+    # 6. UMAP projection (highlight C3: Obfuscation/Encoding)
     umap_paths = plot_umap_projection(
         embeddings,
         categories,
@@ -639,6 +709,7 @@ def run_template_homogeneity_analysis(
         max_samples=8000,
         seed=seed,
         dpi=dpi,
+        highlight_category="C3",
     )
     for p in umap_paths:
         outputs[f"umap_{p.suffix[1:]}"] = p
