@@ -553,6 +553,20 @@ differently---embedded in documents, encoded in Base64, delivered through social
 engineering---the patterns fail. GPT-4o's zero-shot performance (0.71 \Fone{})
 confirms reasoning about intent transfers where pattern matching cannot.
 
+\paragraph{Source-vs-technique confound in transfer.}
+The direct$\to$indirect experiment conflates two shifts: attack
+\emph{technique} (direct vs.\ indirect delivery) and data \emph{source}
+(training draws from Deepset, HackAPrompt, GenTel-Bench, and PINT; testing
+uses Open-Prompt-Injection exclusively). Some of the observed \Fone{} collapse
+may reflect source-specific distributional differences---vocabulary, prompt
+length, formatting conventions---rather than a pure inability to detect
+indirect injection as a technique. Disentangling these factors would require
+indirect injection samples from multiple independent sources, which do not
+currently exist in public benchmarks. We report the transfer result as a
+combined effect and flag the confound explicitly: the 0.21--0.41 \Fone{}
+represents the \emph{practical} gap a deployer would face, even if the
+\emph{mechanistic} cause is partially source-driven.
+
 \paragraph{Not all attack types are equally hard.}
 LOATO per-fold analysis reveals that some categories generalize well (C1:
 Instruction Override, \df{} = 0.037) while others cause large drops (C3:
@@ -593,6 +607,9 @@ to training categories ($r = -0.742$, $R^2 = 0.550$).
 \item \textbf{Low statistical power for LOATO gaps}---only 3/20 are significant
   ($p < 0.05$) with 5--6 folds. Gaps are consistently positive but most
   $p$-values fall in 0.06--0.15.
+\item \textbf{Source confound in transfer}---direct$\to$indirect training and
+  test sets come from different data sources, conflating technique shift with
+  source shift (see Discussion).
 \end{enumerate}
 
 % =============================================================================
@@ -655,10 +672,8 @@ key. Seed: 42. Hardware: Apple Silicon Mac (18~GB).
 \centering
 \footnotesize
 \caption{Mean LOATO \Fone{} by held-out category (averaged across all 20
-  embedding-classifier combinations). Full per-combo breakdown available
-  in the project repository.}
+  embedding-classifier combinations).}
 \label{tab:per-fold-summary}
-\label{tab:full-results}
 \begin{tabular}{llcc}
 \toprule
 \textbf{Held-Out} & \textbf{\Fone{}} & \textbf{Hardest} & \textbf{Easiest} \\
@@ -672,5 +687,64 @@ C3 Obfusc.\ & \textbf{.874} & Instr.$\times$SVM & BGE$\times$MLP \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{table}[h]
+\centering
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\caption{CV vs.\ LOATO \Fone{} (all 20 combos). $^*$SVM uses
+  Nystroem(500)+PCA(128).}
+\label{tab:full-results}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Emb.} & \textbf{Clf.} & \textbf{CV} & \textbf{LOATO} & \textbf{\df{}} \\
+\midrule
+MiniLM & LR & .977 & .917 & .060 \\
+        & SVM$^*$ & .928 & .810 & .118 \\
+        & XGB & .983 & .931 & .052 \\
+        & MLP & .992 & .963 & .029 \\
+\midrule
+BGE & LR & .989 & .957 & .033 \\
+    & SVM$^*$ & .830 & .759 & .071 \\
+    & XGB & .986 & .928 & .058 \\
+    & MLP & .994 & .976 & \textbf{.018} \\
+\midrule
+Instr.\ & LR & .995 & .967 & .028 \\
+         & SVM$^*$ & .896 & .746 & \textbf{.150} \\
+         & XGB & .994 & .958 & .036 \\
+         & MLP & .997 & .977 & .020 \\
+\midrule
+OpenAI & LR & .995 & .966 & .029 \\
+       & SVM$^*$ & .902 & .818 & .084 \\
+       & XGB & .993 & .957 & .035 \\
+       & MLP & \textbf{.997} & .976 & .022 \\
+\midrule
+E5-Mis.\ & LR & .994 & .964 & .030 \\
+          & SVM$^*$ & .851 & .775 & .077 \\
+          & XGB & .987 & .940 & .047 \\
+          & MLP & .996 & \textbf{.977} & .019 \\
+\midrule
+\multicolumn{2}{l}{\textbf{Mean (20)}} & .964 & .913 & .051 \\
+\multicolumn{2}{l}{\textbf{Mean ($-$SVM)}} & .991 & .957 & .034 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Future Work}
+\label{app:future}
+
+Several directions could strengthen LOATO-Bench. (1)~\textbf{Fine-tuned
+transformer baselines}: evaluating DeBERTa-based detectors (e.g.,
+Prompt-Guard-2~\cite{meta2024promptguard}) under the same LOATO protocol would
+clarify whether the generalization gap is specific to embedding+ML pipelines
+or extends to fine-tuned models. (2)~\textbf{Disentangling the
+source-vs-technique confound}: constructing indirect injection samples from
+multiple independent sources would isolate the effect of delivery mechanism
+from source-specific distributional shift. (3)~\textbf{Multilingual
+evaluation}: the current dataset is 98\% English; even a modest non-English
+subset (1K+ samples per language) would enable cross-lingual LOATO.
+(4)~\textbf{Adversarial augmentation}: training on synthetically generated
+attack variants (e.g., paraphrased or encoded versions of known categories)
+may narrow the generalization gap without requiring real novel attacks.
 
 \end{document}
